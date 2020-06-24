@@ -1,4 +1,4 @@
-use crate::handler::PerfHandler;
+use crate::handler::{PerfHandler, PerfHandlerOut, PerfHandlerIn};
 use futures::prelude::*;
 use futures_codec::Framed;
 use libp2p::{
@@ -7,24 +7,33 @@ use libp2p::{
         ConnectedPoint,
     },
     swarm::{
-        IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, PollParameters,
-        ProtocolsHandler,
+        IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
+        PollParameters, ProtocolsHandler,
     },
     Multiaddr, PeerId,
 };
 use std::error;
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
-pub struct Perf {}
+#[derive(Default)]
+pub struct Perf {
+    connected_peers: Vec<(PeerId, Direction)>,
+    outbox: Vec<NetworkBehaviourAction<<<<Self as NetworkBehaviour>::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, <Self as NetworkBehaviour>::OutEvent>>
+}
+
+enum Direction {
+    Incoming,
+    Outgoing,
+}
 
 impl NetworkBehaviour for Perf {
     type ProtocolsHandler = PerfHandler;
 
-    type OutEvent = ();
+    type OutEvent = PerfEvent;
 
     fn new_handler(&mut self) -> Self::ProtocolsHandler {
-        println!("NetworkBehaviour::new_handler");
-        PerfHandler {}
+        PerfHandler::default()
     }
 
     fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
@@ -32,15 +41,37 @@ impl NetworkBehaviour for Perf {
     }
 
     fn inject_connected(&mut self, peer_id: &PeerId) {
-        panic!("inject connected");
+        println!("NetworkBehaviour::inject_connected");
+        for (peer, direction) in &self.connected_peers {
+            if peer == peer_id {
+                if matches!(direction, Direction::Outgoing) {
+                    println!("pushing into outgoing events");
+                    self.outbox
+                        .push(NetworkBehaviourAction::NotifyHandler {
+                            peer_id: peer_id.clone(),
+                            event: PerfHandlerIn::StartPerf,
+                            handler: NotifyHandler::Any,
+                        })
+                }
+            }
+        }
     }
 
     fn inject_disconnected(&mut self, peer_id: &PeerId) {
-        panic!("inject disconnected");
     }
 
-    fn inject_connection_established(&mut self, _: &PeerId, _: &ConnectionId, _: &ConnectedPoint) {
-        panic!("inject connection_established");
+    fn inject_connection_established(
+        &mut self,
+        peer_id: &PeerId,
+        _: &ConnectionId,
+        connected_point: &ConnectedPoint,
+    ) {
+        let direction = match connected_point {
+            ConnectedPoint::Dialer { .. } => Direction::Outgoing,
+            ConnectedPoint::Listener { .. } => Direction::Incoming,
+        };
+
+        self.connected_peers.push((peer_id.clone(), direction));
     }
 
     fn inject_connection_closed(&mut self, _: &PeerId, _: &ConnectionId, _: &ConnectedPoint) {}
@@ -51,7 +82,12 @@ impl NetworkBehaviour for Perf {
         connection: ConnectionId,
         event: <<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::OutEvent,
     ) {
-        panic!("inject_event");
+        match event {
+            PerfHandlerOut::PerfRunDone(duration, transfered) => {
+                self.outbox.push(NetworkBehaviourAction::GenerateEvent(PerfEvent::PerfRunDone(duration, transfered)))
+
+            }
+        }
     }
 
     fn inject_addr_reach_failure(
@@ -83,7 +119,16 @@ impl NetworkBehaviour for Perf {
 
     fn poll(&mut self, cx: &mut Context, params: &mut impl PollParameters)
 -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
-        println!("NetworkBehaviour::poll called");
+        if let Some(action) = self.outbox.pop() {
+            println!("NetworkBehaviour::poll returning action");
+            return Poll::Ready(action);
+        }
+
         return Poll::Pending;
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum PerfEvent {
+    PerfRunDone(Duration, usize),
 }

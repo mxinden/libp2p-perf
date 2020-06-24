@@ -13,3 +13,7 @@ futures_codec = "0.3.4"
 futures = "0.3.1"
 unsigned-varint = { version = "0.3", features = ["futures-codec"] }
 async-std = "~1.6.2"
+bytes = "*"
+
+[dev-dependencies]
+env_logger = "0.7.1"

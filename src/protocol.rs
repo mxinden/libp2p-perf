@@ -12,7 +12,8 @@ impl UpgradeInfo for PerfProtocolConfig {
     type InfoIter = iter::Once<Self::Info>;
 
     fn protocol_info(&self) -> Self::InfoIter {
-        iter::once(Cow::Borrowed(b"backpressure"))
+        // TODO: Rename to `perf`.
+        iter::once(Cow::Borrowed(b"/backpressure"))
     }
 }
 

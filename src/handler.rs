@@ -1,4 +1,6 @@
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::prelude::*;
+use futures::stream::FuturesUnordered;
 use libp2p::{
     core::upgrade::{InboundUpgrade, OutboundUpgrade},
     swarm::{
@@ -7,16 +9,209 @@ use libp2p::{
     },
 };
 use std::io;
+use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
+use crate::behaviour::PerfEvent;
 use crate::protocol::PerfProtocolConfig;
 
-pub struct PerfHandler {}
+#[derive(Default)]
+pub struct PerfHandler {
+    outbox: Vec<
+        ProtocolsHandlerEvent<
+            <Self as ProtocolsHandler>::OutboundProtocol,
+            <Self as ProtocolsHandler>::OutboundOpenInfo,
+            <Self as ProtocolsHandler>::OutEvent,
+            <Self as ProtocolsHandler>::Error,
+        >,
+    >,
+    perf_runs:
+        FuturesUnordered<
+            PerfRun<
+                <<Self as ProtocolsHandler>::InboundProtocol as InboundUpgrade<
+                    NegotiatedSubstream,
+                >>::Output,
+                <<Self as ProtocolsHandler>::OutboundProtocol as OutboundUpgrade<
+                    NegotiatedSubstream,
+                >>::Output,
+            >,
+        >,
+}
+
+enum PerfRun<I, O> {
+    Running {
+        start: Option<std::time::Instant>,
+        transfered: usize,
+        substream: PerfRunStream<I, O>,
+    },
+    Closing {
+        duration: Duration,
+        transfered: usize,
+        substream: O,
+    },
+    Done {
+        duration: std::time::Duration,
+        transfered: usize,
+    },
+    Poisoned,
+}
+
+impl<I, O> PerfRun<I, O> {
+    fn new(substream: PerfRunStream<I, O>) -> Self {
+        PerfRun::Running {
+            start: None,
+            transfered: 0,
+            substream,
+        }
+    }
+}
+
+enum PerfRunStream<I, O> {
+    Receiver(I),
+    Sender(O),
+}
+
+impl<I, O> Unpin for PerfRun<I, O> {}
+
+impl<
+        I: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin,
+        O: Sink<std::io::Cursor<Vec<u8>>> + Unpin,
+    > Future for PerfRun<I, O>
+{
+    type Output = (Duration, usize);
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        loop {
+            match std::mem::replace(&mut *self, PerfRun::Poisoned) {
+                PerfRun::Running {
+                    start,
+                    transfered,
+                    substream: PerfRunStream::Sender(mut substream),
+                } => {
+                    if let Some(start) = start {
+                        if start.elapsed() >= Duration::from_secs(10) {
+                            // TODO: Do we need a closing to flush?
+                            *self = PerfRun::Closing {
+                                duration: start.elapsed(),
+                                transfered,
+                                substream,
+                            };
+
+                            continue;
+                        }
+                    }
+
+                    if let Poll::Pending = substream.poll_ready_unpin(cx) {
+                        *self = PerfRun::Running {
+                            start,
+                            transfered,
+                            substream: PerfRunStream::Sender(substream),
+                        };
+                        return Poll::Pending;
+                    }
+
+                    let start = start.or_else(|| Some(Instant::now()));
+
+                    if substream
+                        .start_send_unpin(std::io::Cursor::new([0; 4096].to_vec()))
+                        .is_err()
+                    {
+                        panic!("sending failed");
+                    }
+
+                    let transfered = transfered + 4096;
+
+                    *self = PerfRun::Running {
+                        start,
+                        transfered,
+                        substream: PerfRunStream::Sender(substream),
+                    };
+                }
+                PerfRun::Running {
+                    start,
+                    transfered,
+                    substream: PerfRunStream::Receiver(mut substream),
+                } => match substream.poll_next_unpin(cx) {
+                    Poll::Ready(Some(msg)) => {
+                        let start = start.or_else(|| Some(Instant::now()));
+                        let len = msg.unwrap().len();
+                        let transfered = transfered + len;
+
+                        *self = PerfRun::Running {
+                            start,
+                            transfered,
+                            substream: PerfRunStream::Receiver(substream),
+                        };
+                    }
+                    Poll::Ready(None) => {
+                        *self = PerfRun::Done {
+                            duration: start.unwrap().elapsed(),
+                            transfered,
+                        };
+
+                        continue;
+                    }
+                    Poll::Pending => {
+                        *self = PerfRun::Running {
+                            start,
+                            transfered,
+                            substream: PerfRunStream::Receiver(substream),
+                        };
+                        return Poll::Pending;
+                    }
+                },
+                PerfRun::Closing {duration, transfered, mut substream } => {
+                    match substream.poll_flush_unpin(cx) {
+                        Poll::Ready(Ok(())) => {
+                            match substream.poll_close_unpin(cx) {
+                                Poll::Ready(Ok(())) => {},
+                                _ => panic!("unxpected"),
+                            };
+                            drop(substream);
+                            std::thread::sleep(Duration::from_secs(1));
+                            *self = PerfRun::Done {
+                                duration, transfered,
+                            };
+                            continue;
+                        }
+                        Poll::Ready(Err(e)) => panic!("Got error while closing substream"),
+                        Poll::Pending => {
+                            *self = PerfRun::Closing {
+                                duration,
+                                transfered,
+                                substream,
+                            };
+                            return Poll::Pending;
+                        }
+                    }
+
+                },
+                PerfRun::Done {
+                    duration,
+                    transfered,
+                } => {
+                    return Poll::Ready((duration, transfered));
+                }
+                PerfRun::Poisoned => panic!("PerfRun::Poisoned"),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum PerfHandlerIn {
+    StartPerf,
+}
+
+pub enum PerfHandlerOut {
+    PerfRunDone(Duration, usize),
+}
 
 impl ProtocolsHandler for PerfHandler {
-    type InEvent = ();
+    type InEvent = PerfHandlerIn;
     /// Custom event that can be produced by the handler and that will be returned to the outside.
-    type OutEvent = ();
+    type OutEvent = PerfHandlerOut;
     /// The type of errors returned by [`ProtocolsHandler::poll`].
     type Error = io::Error;
     /// The inbound upgrade for the protocol(s) used by the handler.
@@ -34,16 +229,16 @@ impl ProtocolsHandler for PerfHandler {
     /// >           not supported, (eg. when only allowing one substream at a time for a protocol).
     /// >           This allows a remote to put the list of supported protocols in a cache.
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol> {
-        println!("listen_protocol");
         SubstreamProtocol::new(PerfProtocolConfig {})
     }
 
     /// Injects the output of a successful upgrade on a new inbound substream.
     fn inject_fully_negotiated_inbound(
         &mut self,
-        protocol: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
+        substream: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
     ) {
-        panic!("yeah, got an inbound substream");
+        self.perf_runs
+            .push(PerfRun::new(PerfRunStream::Receiver(substream)));
     }
 
     /// Injects the output of a successful upgrade on a new outbound substream.
@@ -52,15 +247,24 @@ impl ProtocolsHandler for PerfHandler {
     /// [`ProtocolsHandlerEvent::OutboundSubstreamRequest`].
     fn inject_fully_negotiated_outbound(
         &mut self,
-        protocol: <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Output,
-        info: Self::OutboundOpenInfo,
+        substream: <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Output,
+        _info: Self::OutboundOpenInfo,
     ) {
-        panic!("yeah, got an outbound substream");
+        self.perf_runs
+            .push(PerfRun::new(PerfRunStream::Sender(substream)));
     }
 
     /// Injects an event coming from the outside in the handler.
     fn inject_event(&mut self, event: Self::InEvent) {
-        panic!("inject_event");
+        match event {
+            PerfHandlerIn::StartPerf => {
+                self.outbox
+                    .push(ProtocolsHandlerEvent::OutboundSubstreamRequest {
+                        protocol: SubstreamProtocol::new(PerfProtocolConfig {}),
+                        info: (),
+                    })
+            }
+        }
     }
 
     /// Indicates to the handler that upgrading a substream to the given protocol has failed.
@@ -110,7 +314,20 @@ impl ProtocolsHandler for PerfHandler {
             Self::Error,
         >,
     > {
-        println!("ProtocolsHandler::poll");
+        if let Some(event) = self.outbox.pop() {
+            return Poll::Ready(event);
+        }
+
+        loop {
+            match self.perf_runs.poll_next_unpin(cx) {
+                Poll::Ready(Some((duration, transfered))) => {
+                    return Poll::Ready(ProtocolsHandlerEvent::Custom(PerfHandlerOut::PerfRunDone(duration, transfered)));
+                }
+                Poll::Ready(None) => break,
+                Poll::Pending => break,
+            }
+        }
+
         return Poll::Pending;
     }
 }
