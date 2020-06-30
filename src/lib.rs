@@ -111,6 +111,7 @@ mod tests {
     > {
         Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
             .upgrade(core::upgrade::Version::V1)
+           // TODO: Use noise.
             .authenticate(secio::SecioConfig::new(keypair))
             .multiplex(yamux::Config::default())
             .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))
