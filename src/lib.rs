@@ -1,4 +1,3 @@
-
 mod behaviour;
 mod handler;
 mod protocol;
@@ -8,13 +7,8 @@ mod tests {
     use crate::behaviour::{Perf, PerfEvent};
     use futures::prelude::*;
     use libp2p::{
-        core::{
-            self,
-            Transport,
-        },
-        identity, secio,
-        dns,
-        tcp, PeerId, Swarm,
+        core::{self, Transport},
+        dns, identity, noise, tcp, PeerId, Swarm,
     };
     use libp2p_yamux as yamux;
     use std::task::{Context, Poll};
@@ -61,20 +55,26 @@ mod tests {
 
         Swarm::dial_addr(&mut sender, "/ip4/127.0.0.1/tcp/9992".parse().unwrap()).unwrap();
 
-        let sender_task = async_std::task::spawn(future::poll_fn(move |cx: &mut Context|  -> Poll<()>{
-            loop {
-                match sender.poll_next_unpin(cx) {
-                    Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
-                        println!("Duration {:?}, transfered {:?} rate {:?}", duration, transfered, (transfered / 1024 / 1024) as f64 / duration.as_secs_f64());
-                        return Poll::Ready(());
+        let sender_task =
+            async_std::task::spawn(future::poll_fn(move |cx: &mut Context| -> Poll<()> {
+                loop {
+                    match sender.poll_next_unpin(cx) {
+                        Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
+                            println!(
+                                "Duration {:?}, transfered {:?} rate {:?}",
+                                duration,
+                                transfered,
+                                (transfered / 1024 / 1024) as f64 / duration.as_secs_f64()
+                            );
+                            return Poll::Ready(());
+                        }
+                        Poll::Ready(None) => panic!("unexpected stream close"),
+                        Poll::Pending => break,
                     }
-                    Poll::Ready(None) => panic!("unexpected stream close"),
-                    Poll::Pending => break,
                 }
-            }
 
-            Poll::Pending
-        }));
+                Poll::Pending
+            }));
 
         async_std::task::spawn(future::poll_fn(move |cx: &mut Context| -> Poll<()> {
             receiver.poll_next_unpin(cx).map(|e| println!("{:?}", e))
@@ -87,8 +87,6 @@ mod tests {
         // the receiver side is never finished.
         async_std::task::block_on(sender_task);
     }
-
-
 
     fn build_transport(
         keypair: identity::Keypair,
@@ -111,8 +109,14 @@ mod tests {
     > {
         Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
             .upgrade(core::upgrade::Version::V1)
-           // TODO: Use noise.
-            .authenticate(secio::SecioConfig::new(keypair))
+            .authenticate(
+                noise::NoiseConfig::ix(
+                    noise::Keypair::<noise::X25519>::new()
+                        .into_authentic(&keypair)
+                        .unwrap(),
+                )
+                .into_authenticated(),
+            )
             .multiplex(yamux::Config::default())
             .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))
     }
