@@ -41,15 +41,13 @@ impl NetworkBehaviour for Perf {
     fn inject_connected(&mut self, peer_id: &PeerId) {
         println!("NetworkBehaviour::inject_connected");
         for (peer, direction) in &self.connected_peers {
-            if peer == peer_id {
-                if matches!(direction, Direction::Outgoing) {
-                    println!("pushing into outgoing events");
-                    self.outbox.push(NetworkBehaviourAction::NotifyHandler {
-                        peer_id: peer_id.clone(),
-                        event: PerfHandlerIn::StartPerf,
-                        handler: NotifyHandler::Any,
-                    })
-                }
+            if peer == peer_id && matches!(direction, Direction::Outgoing) {
+                println!("pushing into outgoing events");
+                self.outbox.push(NetworkBehaviourAction::NotifyHandler {
+                    peer_id: peer_id.clone(),
+                    event: PerfHandlerIn::StartPerf,
+                    handler: NotifyHandler::Any,
+                })
             }
         }
     }
@@ -119,7 +117,7 @@ impl NetworkBehaviour for Perf {
             return Poll::Ready(action);
         }
 
-        return Poll::Pending;
+        Poll::Pending
     }
 }
 

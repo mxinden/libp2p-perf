@@ -77,17 +77,7 @@ mod tests {
         }));
 
         async_std::task::spawn(future::poll_fn(move |cx: &mut Context| -> Poll<()> {
-            loop {
-                match receiver.poll_next_unpin(cx) {
-                    Poll::Ready(e) => {
-                        println!("{:?}", e);
-                        return Poll::Ready(());
-                    },
-                    Poll::Pending => break,
-                }
-            }
-
-            Poll::Pending
+            receiver.poll_next_unpin(cx).map(|e| println!("{:?}", e))
         }));
 
         // Don't block on receiver task. When the sender drops the substream it

@@ -303,7 +303,6 @@ impl ProtocolsHandler for PerfHandler {
         KeepAlive::Yes
     }
 
-    /// Should behave like `Stream::poll()`.
     fn poll(
         &mut self,
         cx: &mut Context,
@@ -319,18 +318,17 @@ impl ProtocolsHandler for PerfHandler {
             return Poll::Ready(event);
         }
 
-        loop {
-            match self.perf_runs.poll_next_unpin(cx) {
-                Poll::Ready(Some((duration, transfered))) => {
-                    return Poll::Ready(ProtocolsHandlerEvent::Custom(
-                        PerfHandlerOut::PerfRunDone(duration, transfered),
-                    ));
-                }
-                Poll::Ready(None) => break,
-                Poll::Pending => break,
+        match self.perf_runs.poll_next_unpin(cx) {
+            Poll::Ready(Some((duration, transfered))) => {
+                return Poll::Ready(ProtocolsHandlerEvent::Custom(
+                    PerfHandlerOut::PerfRunDone(duration, transfered),
+                ));
             }
+            // No Futures within `self.perf_runs`.
+            Poll::Ready(None) => {},
+            Poll::Pending => {},
         }
 
-        return Poll::Pending;
+        Poll::Pending
     }
 }
