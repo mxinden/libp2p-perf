@@ -2,16 +2,53 @@ mod behaviour;
 mod handler;
 mod protocol;
 
+pub use behaviour::{Perf, PerfEvent};
+
+use libp2p::{
+    core::{self, Transport},
+    dns, identity, noise, tcp, PeerId,
+};
+use libp2p_yamux as yamux;
+
+pub fn build_transport(
+    keypair: identity::Keypair,
+) -> std::io::Result<
+    impl Transport<
+            Output = (
+                PeerId,
+                impl core::muxing::StreamMuxer<
+                        OutboundSubstream = impl Send,
+                        Substream = impl Send,
+                        Error = impl Into<std::io::Error>,
+                    > + Send
+                    + Sync,
+            ),
+            Error = impl std::error::Error + Send,
+            Listener = impl Send,
+            Dial = impl Send,
+            ListenerUpgrade = impl Send,
+        > + Clone,
+> {
+    Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
+        .upgrade(core::upgrade::Version::V1)
+        .authenticate(
+            noise::NoiseConfig::ix(
+                noise::Keypair::<noise::X25519>::new()
+                    .into_authentic(&keypair)
+                    .unwrap(),
+            )
+            .into_authenticated(),
+        )
+        .multiplex(yamux::Config::default())
+        .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::behaviour::{Perf, PerfEvent};
+    use super::*;
     use futures::future::poll_fn;
     use futures::prelude::*;
-    use libp2p::{
-        core::{self, Transport},
-        dns, identity, noise, tcp, PeerId, Swarm,
-    };
-    use libp2p_yamux as yamux;
+    use libp2p::Swarm;
     use std::task::Poll;
     use std::time::Duration;
 
@@ -46,7 +83,7 @@ mod tests {
                 Poll::Pending => {
                     if let Some(a) = Swarm::listeners(&receiver).next() {
                         println!("{:?}", a);
-                        return Poll::Ready(())
+                        return Poll::Ready(());
                     }
 
                     return Poll::Pending;
@@ -90,38 +127,5 @@ mod tests {
         // learn about the connection being closed. In that case the perfrun on
         // the receiver side is never finished.
         async_std::task::block_on(sender_task);
-    }
-
-    fn build_transport(
-        keypair: identity::Keypair,
-    ) -> std::io::Result<
-        impl Transport<
-                Output = (
-                    PeerId,
-                    impl core::muxing::StreamMuxer<
-                            OutboundSubstream = impl Send,
-                            Substream = impl Send,
-                            Error = impl Into<std::io::Error>,
-                        > + Send
-                        + Sync,
-                ),
-                Error = impl std::error::Error + Send,
-                Listener = impl Send,
-                Dial = impl Send,
-                ListenerUpgrade = impl Send,
-            > + Clone,
-    > {
-        Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
-            .upgrade(core::upgrade::Version::V1)
-            .authenticate(
-                noise::NoiseConfig::ix(
-                    noise::Keypair::<noise::X25519>::new()
-                        .into_authentic(&keypair)
-                        .unwrap(),
-                )
-                .into_authenticated(),
-            )
-            .multiplex(yamux::Config::default())
-            .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))
     }
 }
