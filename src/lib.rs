@@ -104,12 +104,6 @@ mod tests {
                         panic!("Expected test to run roughly 10 seconds.")
                     }
 
-                    println!(
-                        "Duration {:?}, transfered {:?} rate {:?}",
-                        duration,
-                        transfered,
-                        (transfered / 1024 / 1024) as f64 / duration.as_secs_f64()
-                    );
                     return Poll::Ready(());
                 }
                 Poll::Ready(None) => panic!("unexpected stream close"),

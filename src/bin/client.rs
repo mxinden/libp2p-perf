@@ -1,9 +1,8 @@
 use futures::future::poll_fn;
 use futures::prelude::*;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
-use libp2p_perf::{build_transport, Perf, PerfEvent};
+use libp2p_perf::{build_transport, Perf};
 use std::task::Poll;
-use std::time::Duration;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -29,21 +28,8 @@ fn main() {
     Swarm::dial_addr(&mut client, opt.server_address).unwrap();
 
     futures::executor::block_on(poll_fn(|cx| match client.poll_next_unpin(cx) {
-        Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
-            if duration < Duration::from_secs(10) {
-                panic!("Expected test to run at least 10 seconds.")
-            }
-
-            if duration > Duration::from_secs(11) {
-                panic!("Expected test to run roughly 10 seconds.")
-            }
-
-            println!(
-                "Duration {:?}, transfered {:?} rate {:?}",
-                duration,
-                transfered,
-                (transfered / 1024 / 1024) as f64 / duration.as_secs_f64()
-            );
+        Poll::Ready(Some(e)) => {
+            println!("{}", e);
 
             Poll::Ready(())
         }

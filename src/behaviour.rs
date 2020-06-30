@@ -11,6 +11,7 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use std::error;
+use std::fmt;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -39,10 +40,8 @@ impl NetworkBehaviour for Perf {
     }
 
     fn inject_connected(&mut self, peer_id: &PeerId) {
-        println!("NetworkBehaviour::inject_connected");
         for (peer, direction) in &self.connected_peers {
             if peer == peer_id && matches!(direction, Direction::Outgoing) {
-                println!("pushing into outgoing events");
                 self.outbox.push(NetworkBehaviourAction::NotifyHandler {
                     peer_id: peer_id.clone(),
                     event: PerfHandlerIn::StartPerf,
@@ -113,7 +112,6 @@ impl NetworkBehaviour for Perf {
     fn poll(&mut self, _cx: &mut Context, _params: &mut impl PollParameters)
 -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
         if let Some(action) = self.outbox.pop() {
-            println!("NetworkBehaviour::poll returning action");
             return Poll::Ready(action);
         }
 
@@ -124,4 +122,19 @@ impl NetworkBehaviour for Perf {
 #[derive(Debug, Clone)]
 pub enum PerfEvent {
     PerfRunDone(Duration, usize),
+}
+
+impl fmt::Display for PerfEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PerfEvent::PerfRunDone(duration, transfered) => write!(
+                f,
+                "Interval\t\tTransfer\tBandwidth\n{:?} - {:?}\t{:?} mb\t{:?} mb/s",
+                Duration::from_secs(0),
+                duration,
+                transfered / 1000 / 1000,
+                (transfered / 1000 / 1000) as f64 / duration.as_secs_f64()
+            ),
+        }
+    }
 }

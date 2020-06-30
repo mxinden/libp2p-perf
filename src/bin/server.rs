@@ -26,7 +26,7 @@ fn main() {
     let mut server = Swarm::new(transport, perf, local_peer_id);
 
     Swarm::listen_on(&mut server, opt.listen_address).unwrap();
-    let listening = false;
+    let mut listening = false;
 
     futures::executor::block_on(poll_fn(|cx| match server.poll_next_unpin(cx) {
         Poll::Ready(e) => panic!(
@@ -37,6 +37,7 @@ fn main() {
             if !listening {
                 if let Some(a) = Swarm::listeners(&server).next() {
                     println!("Listening on {:?}.", a);
+                    listening = true;
                 }
             }
 
