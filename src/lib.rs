@@ -5,13 +5,15 @@ mod protocol;
 #[cfg(test)]
 mod tests {
     use crate::behaviour::{Perf, PerfEvent};
+    use futures::future::poll_fn;
     use futures::prelude::*;
     use libp2p::{
         core::{self, Transport},
         dns, identity, noise, tcp, PeerId, Swarm,
     };
     use libp2p_yamux as yamux;
-    use std::task::{Context, Poll};
+    use std::task::Poll;
+    use std::time::Duration;
 
     #[test]
     fn it_works() {
@@ -37,46 +39,48 @@ mod tests {
         Swarm::listen_on(&mut sender, "/ip4/0.0.0.0/tcp/9991".parse().unwrap()).unwrap();
         Swarm::listen_on(&mut receiver, "/ip4/0.0.0.0/tcp/9992".parse().unwrap()).unwrap();
 
-        async_std::task::block_on(future::poll_fn(|cx| -> Poll<()> {
-            loop {
-                match receiver.poll_next_unpin(cx) {
-                    Poll::Ready(e) => panic!("{:?}", e),
-                    Poll::Pending => {
-                        if let Some(a) = Swarm::listeners(&receiver).next() {
-                            println!("{:?}", a);
-                            break;
-                        }
+        // Wait for receiver to bind to port.
+        async_std::task::block_on(poll_fn(|cx| -> Poll<()> {
+            match receiver.poll_next_unpin(cx) {
+                Poll::Ready(e) => panic!("{:?}", e),
+                Poll::Pending => {
+                    if let Some(a) = Swarm::listeners(&receiver).next() {
+                        println!("{:?}", a);
+                        return Poll::Ready(())
                     }
+
+                    return Poll::Pending;
                 }
             }
-
-            Poll::Ready(())
         }));
 
         Swarm::dial_addr(&mut sender, "/ip4/127.0.0.1/tcp/9992".parse().unwrap()).unwrap();
 
-        let sender_task =
-            async_std::task::spawn(future::poll_fn(move |cx: &mut Context| -> Poll<()> {
-                loop {
-                    match sender.poll_next_unpin(cx) {
-                        Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
-                            println!(
-                                "Duration {:?}, transfered {:?} rate {:?}",
-                                duration,
-                                transfered,
-                                (transfered / 1024 / 1024) as f64 / duration.as_secs_f64()
-                            );
-                            return Poll::Ready(());
-                        }
-                        Poll::Ready(None) => panic!("unexpected stream close"),
-                        Poll::Pending => break,
+        let sender_task = async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
+            match sender.poll_next_unpin(cx) {
+                Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
+                    if duration < Duration::from_secs(10) {
+                        panic!("Expected test to run at least 10 seconds.")
                     }
+
+                    if duration > Duration::from_secs(11) {
+                        panic!("Expected test to run roughly 10 seconds.")
+                    }
+
+                    println!(
+                        "Duration {:?}, transfered {:?} rate {:?}",
+                        duration,
+                        transfered,
+                        (transfered / 1024 / 1024) as f64 / duration.as_secs_f64()
+                    );
+                    return Poll::Ready(());
                 }
+                Poll::Ready(None) => panic!("unexpected stream close"),
+                Poll::Pending => return Poll::Pending,
+            }
+        }));
 
-                Poll::Pending
-            }));
-
-        async_std::task::spawn(future::poll_fn(move |cx: &mut Context| -> Poll<()> {
+        async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
             receiver.poll_next_unpin(cx).map(|e| println!("{:?}", e))
         }));
 
