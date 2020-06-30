@@ -1,4 +1,4 @@
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::BytesMut;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use libp2p::{
@@ -13,7 +13,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-use crate::behaviour::PerfEvent;
 use crate::protocol::PerfProtocolConfig;
 
 #[derive(Default)]
@@ -161,31 +160,33 @@ impl<
                         return Poll::Pending;
                     }
                 },
-                PerfRun::Closing {duration, transfered, mut substream } => {
-                    match substream.poll_flush_unpin(cx) {
-                        Poll::Ready(Ok(())) => {
-                            match substream.poll_close_unpin(cx) {
-                                Poll::Ready(Ok(())) => {},
-                                _ => panic!("unxpected"),
-                            };
-                            drop(substream);
-                            std::thread::sleep(Duration::from_secs(1));
-                            *self = PerfRun::Done {
-                                duration, transfered,
-                            };
-                            continue;
-                        }
-                        Poll::Ready(Err(e)) => panic!("Got error while closing substream"),
-                        Poll::Pending => {
-                            *self = PerfRun::Closing {
-                                duration,
-                                transfered,
-                                substream,
-                            };
-                            return Poll::Pending;
-                        }
+                PerfRun::Closing {
+                    duration,
+                    transfered,
+                    mut substream,
+                } => match substream.poll_flush_unpin(cx) {
+                    Poll::Ready(Ok(())) => {
+                        match substream.poll_close_unpin(cx) {
+                            Poll::Ready(Ok(())) => {}
+                            _ => panic!("unxpected"),
+                        };
+                        drop(substream);
+                        std::thread::sleep(Duration::from_secs(1));
+                        *self = PerfRun::Done {
+                            duration,
+                            transfered,
+                        };
+                        continue;
                     }
-
+                    Poll::Ready(Err(_)) => panic!("Got error while closing substream"),
+                    Poll::Pending => {
+                        *self = PerfRun::Closing {
+                            duration,
+                            transfered,
+                            substream,
+                        };
+                        return Poll::Pending;
+                    }
                 },
                 PerfRun::Done {
                     duration,
@@ -270,7 +271,7 @@ impl ProtocolsHandler for PerfHandler {
     /// Indicates to the handler that upgrading a substream to the given protocol has failed.
     fn inject_dial_upgrade_error(
         &mut self,
-        info: Self::OutboundOpenInfo,
+        _info: Self::OutboundOpenInfo,
         error: ProtocolsHandlerUpgrErr<
             <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Error,
         >,
@@ -321,7 +322,9 @@ impl ProtocolsHandler for PerfHandler {
         loop {
             match self.perf_runs.poll_next_unpin(cx) {
                 Poll::Ready(Some((duration, transfered))) => {
-                    return Poll::Ready(ProtocolsHandlerEvent::Custom(PerfHandlerOut::PerfRunDone(duration, transfered)));
+                    return Poll::Ready(ProtocolsHandlerEvent::Custom(
+                        PerfHandlerOut::PerfRunDone(duration, transfered),
+                    ));
                 }
                 Poll::Ready(None) => break,
                 Poll::Pending => break,

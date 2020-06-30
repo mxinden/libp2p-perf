@@ -1,6 +1,4 @@
-use crate::handler::{PerfHandler, PerfHandlerOut, PerfHandlerIn};
-use futures::prelude::*;
-use futures_codec::Framed;
+use crate::handler::{PerfHandler, PerfHandlerIn, PerfHandlerOut};
 use libp2p::{
     core::{
         connection::{ConnectionId, ListenerId},
@@ -14,7 +12,7 @@ use libp2p::{
 };
 use std::error;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Default)]
 pub struct Perf {
@@ -36,7 +34,7 @@ impl NetworkBehaviour for Perf {
         PerfHandler::default()
     }
 
-    fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
+    fn addresses_of_peer(&mut self, _peer_id: &PeerId) -> Vec<Multiaddr> {
         vec![]
     }
 
@@ -46,19 +44,17 @@ impl NetworkBehaviour for Perf {
             if peer == peer_id {
                 if matches!(direction, Direction::Outgoing) {
                     println!("pushing into outgoing events");
-                    self.outbox
-                        .push(NetworkBehaviourAction::NotifyHandler {
-                            peer_id: peer_id.clone(),
-                            event: PerfHandlerIn::StartPerf,
-                            handler: NotifyHandler::Any,
-                        })
+                    self.outbox.push(NetworkBehaviourAction::NotifyHandler {
+                        peer_id: peer_id.clone(),
+                        event: PerfHandlerIn::StartPerf,
+                        handler: NotifyHandler::Any,
+                    })
                 }
             }
         }
     }
 
-    fn inject_disconnected(&mut self, peer_id: &PeerId) {
-    }
+    fn inject_disconnected(&mut self, _peer_id: &PeerId) {}
 
     fn inject_connection_established(
         &mut self,
@@ -78,15 +74,14 @@ impl NetworkBehaviour for Perf {
 
     fn inject_event(
         &mut self,
-        peer_id: PeerId,
-        connection: ConnectionId,
+        _peer_id: PeerId,
+        _connection: ConnectionId,
         event: <<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::OutEvent,
     ) {
         match event {
-            PerfHandlerOut::PerfRunDone(duration, transfered) => {
-                self.outbox.push(NetworkBehaviourAction::GenerateEvent(PerfEvent::PerfRunDone(duration, transfered)))
-
-            }
+            PerfHandlerOut::PerfRunDone(duration, transfered) => self.outbox.push(
+                NetworkBehaviourAction::GenerateEvent(PerfEvent::PerfRunDone(duration, transfered)),
+            ),
         }
     }
 
@@ -117,7 +112,7 @@ impl NetworkBehaviour for Perf {
         panic!("listener closed {:?}", reason);
     }
 
-    fn poll(&mut self, cx: &mut Context, params: &mut impl PollParameters)
+    fn poll(&mut self, _cx: &mut Context, _params: &mut impl PollParameters)
 -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
         if let Some(action) = self.outbox.pop() {
             println!("NetworkBehaviour::poll returning action");
