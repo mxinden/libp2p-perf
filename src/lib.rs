@@ -95,7 +95,7 @@ mod tests {
 
         let sender_task = async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
             match sender.poll_next_unpin(cx) {
-                Poll::Ready(Some(PerfEvent::PerfRunDone(duration, transfered))) => {
+                Poll::Ready(Some(PerfEvent::PerfRunDone(duration, _transfered))) => {
                     if duration < Duration::from_secs(10) {
                         panic!("Expected test to run at least 10 seconds.")
                     }

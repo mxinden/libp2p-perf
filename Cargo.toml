@@ -9,9 +9,9 @@ edition = "2018"
 [dependencies]
 libp2p = { version = "0.20.1", default-features = false, features = ["dns", "noise", "tcp-async-std"] }
 libp2p-yamux = "*"
-futures_codec = "0.3.4"
+futures_codec = "0.4"
 futures = "0.3.1"
-unsigned-varint = { version = "0.3", features = ["futures-codec"] }
+unsigned-varint = { version = "0.4", features = ["futures-codec"] }
 async-std = "~1.6.2"
 bytes = "*"
 structopt = "0.3"
