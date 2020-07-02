@@ -15,7 +15,8 @@ struct Opt {
     server_address: Multiaddr,
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let opt = Opt::from_args();
 
     let key = identity::Keypair::generate_ed25519();
@@ -27,7 +28,7 @@ fn main() {
 
     Swarm::dial_addr(&mut client, opt.server_address).unwrap();
 
-    futures::executor::block_on(poll_fn(|cx| match client.poll_next_unpin(cx) {
+    poll_fn(|cx| match client.poll_next_unpin(cx) {
         Poll::Ready(Some(e)) => {
             println!("{}", e);
 
@@ -35,5 +36,5 @@ fn main() {
         }
         Poll::Ready(None) => panic!("Client finished unexpectedly."),
         Poll::Pending => Poll::Pending,
-    }))
+    }).await
 }

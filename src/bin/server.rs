@@ -15,7 +15,8 @@ struct Opt {
     listen_address: Multiaddr,
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let opt = Opt::from_args();
 
     let key = identity::Keypair::generate_ed25519();
@@ -28,7 +29,7 @@ fn main() {
     Swarm::listen_on(&mut server, opt.listen_address).unwrap();
     let mut listening = false;
 
-    futures::executor::block_on(poll_fn(|cx| match server.poll_next_unpin(cx) {
+    poll_fn(|cx| match server.poll_next_unpin(cx) {
         Poll::Ready(e) => panic!(
             "Not expecting server swarm to return any event but got {:?}.",
             e
@@ -43,5 +44,5 @@ fn main() {
 
             Poll::Pending
         }
-    }))
+    }).await
 }
