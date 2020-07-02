@@ -89,7 +89,7 @@ mod tests {
                         return Poll::Ready(());
                     }
 
-                    return Poll::Pending;
+                    Poll::Pending
                 }
             }
         }));
@@ -107,10 +107,10 @@ mod tests {
                         panic!("Expected test to run roughly 10 seconds.")
                     }
 
-                    return Poll::Ready(());
+                    Poll::Ready(())
                 }
                 Poll::Ready(None) => panic!("unexpected stream close"),
-                Poll::Pending => return Poll::Pending,
+                Poll::Pending => Poll::Pending,
             }
         }));
 

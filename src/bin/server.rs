@@ -41,7 +41,7 @@ fn main() {
                 }
             }
 
-            return Poll::Pending;
+            Poll::Pending
         }
     }))
 }
