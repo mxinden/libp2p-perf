@@ -29,6 +29,9 @@ pub fn build_transport(
             ListenerUpgrade = impl Send,
         > + Clone,
 > {
+    let mut yamux_config = yamux::Config::default();
+    yamux_config.set_window_update_mode(yamux::WindowUpdateMode::OnRead);
+
     Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
         .upgrade(core::upgrade::Version::V1)
         .authenticate(
@@ -39,7 +42,7 @@ pub fn build_transport(
             )
             .into_authenticated(),
         )
-        .multiplex(yamux::Config::default())
+        .multiplex(yamux_config)
         .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))
 }
 
