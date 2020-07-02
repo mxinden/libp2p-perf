@@ -326,13 +326,13 @@ impl ProtocolsHandler for PerfHandler {
 
         match self.perf_runs.poll_next_unpin(cx) {
             Poll::Ready(Some((duration, transfered))) => {
-                return Poll::Ready(ProtocolsHandlerEvent::Custom(
-                    PerfHandlerOut::PerfRunDone(duration, transfered),
-                ));
+                return Poll::Ready(ProtocolsHandlerEvent::Custom(PerfHandlerOut::PerfRunDone(
+                    duration, transfered,
+                )));
             }
             // No Futures within `self.perf_runs`.
-            Poll::Ready(None) => {},
-            Poll::Pending => {},
+            Poll::Ready(None) => {}
+            Poll::Pending => {}
         }
 
         Poll::Pending
