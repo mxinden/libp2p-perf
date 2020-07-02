@@ -18,3 +18,7 @@ structopt = "0.3"
 
 [dev-dependencies]
 env_logger = "0.7.1"
+
+# Include debugging symbols in release binary.
+[profile.release]
+debug = true
