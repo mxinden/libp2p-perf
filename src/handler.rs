@@ -15,6 +15,12 @@ use std::time::{Duration, Instant};
 
 use crate::protocol::PerfProtocolConfig;
 
+// iPerf works by writing an array of len bytes a number of times. Default is
+// 128 KB for TCP, 8 KB for UDP.
+//
+// https://iperf.fr/iperf-doc.php
+const BUFFER_SIZE: usize = 128_000;
+
 #[derive(Default)]
 pub struct PerfHandler {
     outbox: Vec<
@@ -113,13 +119,13 @@ impl<
                     let start = start.or_else(|| Some(Instant::now()));
 
                     if substream
-                        .start_send_unpin(std::io::Cursor::new([0; 4096].to_vec()))
+                        .start_send_unpin(std::io::Cursor::new([0; BUFFER_SIZE].to_vec()))
                         .is_err()
                     {
                         panic!("sending failed");
                     }
 
-                    let transfered = transfered + 4096;
+                    let transfered = transfered + BUFFER_SIZE;
 
                     *self = PerfRun::Running {
                         start,
