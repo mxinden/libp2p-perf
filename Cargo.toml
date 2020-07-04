@@ -15,9 +15,9 @@ unsigned-varint = { version = "0.4", features = ["futures-codec"] }
 async-std = { version = "1.6.2", features = ["attributes"] }
 bytes = "0.5.5"
 structopt = "0.3"
+env_logger = "0.7.1"
 
 [dev-dependencies]
-env_logger = "0.7.1"
 
 # Include debugging symbols in release binary.
 [profile.release]

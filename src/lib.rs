@@ -9,6 +9,18 @@ use libp2p::{
     dns, identity, noise, tcp, PeerId,
 };
 use libp2p_yamux as yamux;
+use std::pin::Pin;
+use libp2p::core::Executor as TExecutor;
+use futures::prelude::*;
+
+pub struct Executor {
+}
+
+impl TExecutor for Executor {
+    fn exec(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
+        async_std::task::spawn(future);
+    }
+}
 
 pub fn build_transport(
     keypair: identity::Keypair,
