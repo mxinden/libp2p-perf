@@ -129,10 +129,11 @@ impl fmt::Display for PerfEvent {
         match self {
             PerfEvent::PerfRunDone(duration, transfered) => write!(
                 f,
-                "Interval\tTransfer\tBandwidth\n0 s - {:.2} s\t{:?} mb\t\t{:.2} mb/s",
+                "Interval\tTransfer\tBandwidth\n\
+                 0 s - {:.2} s\t{:?} MBytes\t{:.2} MBit/s",
                 duration.as_secs_f64(),
                 transfered / 1000 / 1000,
-                (transfered / 1000 / 1000) as f64 / duration.as_secs_f64()
+                (transfered / 1000 / 1000 * 8) as f64 / duration.as_secs_f64()
             ),
         }
     }
