@@ -34,6 +34,13 @@ async fn main() {
         Poll::Ready(Some(e)) => {
             println!("{}", e);
 
+            // TODO: Fix hack
+            //
+            // Performance run timer has already been stopped. Wait for a second
+            // to make sure the receiving side of the substream on the server is
+            // closed before the whole connection is dropped.
+            std::thread::sleep(std::time::Duration::from_secs(1));
+
             Poll::Ready(())
         }
         Poll::Ready(None) => panic!("Client finished unexpectedly."),
