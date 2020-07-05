@@ -31,20 +31,20 @@ async fn main() {
     Swarm::listen_on(&mut server, opt.listen_address).unwrap();
     let mut listening = false;
 
-    poll_fn(|cx| match server.poll_next_unpin(cx) {
-        Poll::Ready(e) => panic!(
-            "Not expecting server swarm to return any event but got {:?}.",
-            e
-        ),
-        Poll::Pending => {
-            if !listening {
-                if let Some(a) = Swarm::listeners(&server).next() {
-                    println!("Listening on {:?}.", a);
-                    listening = true;
+    poll_fn(|cx| loop {
+        match server.poll_next_unpin(cx) {
+            Poll::Ready(Some(e)) => println!("{}", e),
+            Poll::Ready(None) => panic!("Unexpected server termination."),
+            Poll::Pending => {
+                if !listening {
+                    if let Some(a) = Swarm::listeners(&server).next() {
+                        println!("Listening on {:?}.", a);
+                        listening = true;
+                    }
                 }
-            }
 
-            Poll::Pending
+                return Poll::Pending;
+            }
         }
     }).await
 }
