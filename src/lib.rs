@@ -4,17 +4,16 @@ mod protocol;
 
 pub use behaviour::{Perf, PerfEvent};
 
+use futures::prelude::*;
+use libp2p::core::Executor as TExecutor;
 use libp2p::{
     core::{self, Transport},
     dns, identity, noise, tcp, PeerId,
 };
 use libp2p_yamux as yamux;
 use std::pin::Pin;
-use libp2p::core::Executor as TExecutor;
-use futures::prelude::*;
 
-pub struct Executor {
-}
+pub struct Executor {}
 
 impl TExecutor for Executor {
     fn exec(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
