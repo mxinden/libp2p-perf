@@ -4,7 +4,7 @@ mod protocol;
 
 pub use behaviour::{Perf, PerfEvent};
 
-use futures::prelude::*;
+use futures::future::Future;
 use libp2p::core::Executor as TExecutor;
 use libp2p::{
     core::{self, Transport},
