@@ -1,4 +1,4 @@
-use bytes::BytesMut;
+use bytes::{BytesMut, Bytes};
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use libp2p::{
@@ -20,6 +20,8 @@ use crate::protocol::PerfProtocolConfig;
 //
 // https://iperf.fr/iperf-doc.php
 const BUFFER_SIZE: usize = 128_000;
+
+const MSG: &'static [u8] = &[0u8; BUFFER_SIZE];
 
 #[derive(Default)]
 pub struct PerfHandler {
@@ -81,7 +83,7 @@ impl<I, O> Unpin for PerfRun<I, O> {}
 
 impl<
         I: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin,
-        O: Sink<std::io::Cursor<Vec<u8>>> + Unpin,
+        O: Sink<Bytes> + Unpin,
     > Future for PerfRun<I, O>
 {
     type Output = (Duration, usize);
@@ -119,7 +121,7 @@ impl<
                     let start = start.or_else(|| Some(Instant::now()));
 
                     if substream
-                        .start_send_unpin(std::io::Cursor::new([0; BUFFER_SIZE].to_vec()))
+                        .start_send_unpin(Bytes::from(MSG))
                         .is_err()
                     {
                         panic!("sending failed");

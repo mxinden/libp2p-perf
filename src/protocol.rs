@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures::prelude::*;
 use futures_codec::Framed;
 use libp2p::core::upgrade::{InboundUpgrade, OutboundUpgrade, UpgradeInfo};
@@ -21,7 +22,7 @@ impl<C> InboundUpgrade<C> for PerfProtocolConfig
 where
     C: AsyncRead + AsyncWrite + Unpin,
 {
-    type Output = Framed<C, UviBytes<io::Cursor<Vec<u8>>>>;
+    type Output = Framed<C, UviBytes<Bytes>>;
     type Future = future::Ready<Result<Self::Output, io::Error>>;
     type Error = io::Error;
 
@@ -37,7 +38,7 @@ impl<C> OutboundUpgrade<C> for PerfProtocolConfig
 where
     C: AsyncRead + AsyncWrite + Unpin,
 {
-    type Output = Framed<C, UviBytes<io::Cursor<Vec<u8>>>>;
+    type Output = Framed<C, UviBytes<Bytes>>;
     type Future = future::Ready<Result<Self::Output, io::Error>>;
     type Error = io::Error;
 
