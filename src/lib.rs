@@ -8,9 +8,8 @@ use futures::future::Future;
 use libp2p::core::Executor as TExecutor;
 use libp2p::{
     core::{self, Transport},
-    dns, identity, noise, tcp, PeerId,
+    dns, identity, noise, tcp, yamux, PeerId,
 };
-use libp2p_yamux as yamux;
 use std::pin::Pin;
 
 pub struct Executor {}
