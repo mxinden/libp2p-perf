@@ -227,6 +227,8 @@ impl ProtocolsHandler for PerfHandler {
     type InboundProtocol = PerfProtocolConfig;
     /// The outbound upgrade for the protocol(s) used by the handler.
     type OutboundProtocol = PerfProtocolConfig;
+    /// The type of additional information returned from `listen_protocol`.
+    type InboundOpenInfo = ();
     /// The type of additional information passed to an `OutboundSubstreamRequest`.
     type OutboundOpenInfo = ();
 
@@ -237,14 +239,15 @@ impl ProtocolsHandler for PerfHandler {
     /// >           supported protocols, even if in a specific context a particular one is
     /// >           not supported, (eg. when only allowing one substream at a time for a protocol).
     /// >           This allows a remote to put the list of supported protocols in a cache.
-    fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol> {
-        SubstreamProtocol::new(PerfProtocolConfig {})
+    fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
+        SubstreamProtocol::new(PerfProtocolConfig {}, ())
     }
 
     /// Injects the output of a successful upgrade on a new inbound substream.
     fn inject_fully_negotiated_inbound(
         &mut self,
         substream: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
+        _info: Self::InboundOpenInfo,
     ) {
         self.perf_runs
             .push(PerfRun::new(PerfRunStream::Receiver(substream)));
@@ -269,8 +272,7 @@ impl ProtocolsHandler for PerfHandler {
             PerfHandlerIn::StartPerf => {
                 self.outbox
                     .push(ProtocolsHandlerEvent::OutboundSubstreamRequest {
-                        protocol: SubstreamProtocol::new(PerfProtocolConfig {}),
-                        info: (),
+                        protocol: SubstreamProtocol::new(PerfProtocolConfig {}, ()),
                     })
             }
         }
