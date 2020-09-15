@@ -13,10 +13,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	noise "github.com/libp2p/go-libp2p-noise"
+	yamux "github.com/libp2p/go-libp2p-yamux"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
 const BUFFER_SIZE = 128_000
+const PROTOCOL_NAME = "/perf/0.1.0"
 
 var MSG = make([]byte, BUFFER_SIZE)
 
@@ -30,12 +33,11 @@ func main() {
 	}
 
 	opts := []libp2p.Option{
+		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", 0)),
 		libp2p.Identity(priv),
-		libp2p.DisableRelay(),
+		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 	}
-
-	opts = append(opts, libp2p.NoSecurity)
 
 	basicHost, err := libp2p.New(context.Background(), opts...)
 	if err != nil {
@@ -48,10 +50,7 @@ func main() {
 
 	log.Printf("Now run \"./echo -d %s\" on a different terminal\n", fullAddr)
 
-	// Set a stream handler on host A. /echo/1.0.0 is
-	// a user-defined protocol name.
-	basicHost.SetStreamHandler("/echo/1.0.0", func(s network.Stream) {
-		log.Println("Got a new stream!")
+	basicHost.SetStreamHandler(PROTOCOL_NAME, func(s network.Stream) {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
 			s.Reset()
@@ -85,18 +84,14 @@ func main() {
 
 	// Decapsulate the /ipfs/<peerID> part from the target
 	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", pid))
+	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", pid))
 	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
 
 	// We have a peer ID and a targetAddr so we add it to the peerstore
 	// so LibP2P knows how to contact it
 	basicHost.Peerstore().AddAddr(peerid, targetAddr, peerstore.PermanentAddrTTL)
 
-	log.Println("opening stream")
-	// make a new stream from host B to host A
-	// it should be handled on host A by the handler we set above because
-	// we use the same /echo/1.0.0 protocol
-	s, err := basicHost.NewStream(context.Background(), peerid, "/echo/1.0.0")
+	s, err := basicHost.NewStream(context.Background(), peerid, PROTOCOL_NAME)
 	if err != nil {
 		log.Fatalln(err)
 	}
