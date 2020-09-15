@@ -6,6 +6,8 @@ use std::io;
 use std::{borrow::Cow, iter};
 use unsigned_varint::codec::UviBytes;
 
+const PROTOCOL_NAME: &[u8] = b"/perf/0.1.0";
+
 pub struct PerfProtocolConfig {}
 
 impl UpgradeInfo for PerfProtocolConfig {
@@ -14,7 +16,7 @@ impl UpgradeInfo for PerfProtocolConfig {
 
     fn protocol_info(&self) -> Self::InfoIter {
         // TODO: Rename to `perf`.
-        iter::once(Cow::Borrowed(b"/backpressure"))
+        iter::once(Cow::Borrowed(PROTOCOL_NAME))
     }
 }
 
