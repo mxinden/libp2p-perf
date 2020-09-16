@@ -39,7 +39,6 @@ pub fn build_transport(
             ListenerUpgrade = impl Send,
         > + Clone,
 > {
-
     let mut yamux_config = yamux::Config::default();
     yamux_config.set_window_update_mode(yamux::WindowUpdateMode::OnRead);
 
