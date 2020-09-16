@@ -21,7 +21,7 @@ use crate::protocol::PerfProtocolConfig;
 // https://iperf.fr/iperf-doc.php
 const BUFFER_SIZE: usize = 128_000;
 
-const MSG: &'static [u8] = &[0u8; BUFFER_SIZE];
+const MSG: &[u8] = &[0u8; BUFFER_SIZE];
 
 #[derive(Default)]
 pub struct PerfHandler {
