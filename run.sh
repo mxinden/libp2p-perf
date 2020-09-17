@@ -10,7 +10,7 @@ set -u
 trap "kill 0" EXIT
 
 echo "# Start Rust and Golang servers."
-./rust/target/release/server --listen-address /ip4/0.0.0.0/tcp/9992 --private-key-pkcs8 rust/private.pk8 > /dev/null 2>&1 &
+./rust/target/release/server --listen-address /ip4/0.0.0.0/tcp/9992 --private-key-pkcs8 rust/test.pk8 > /dev/null 2>&1 &
 ./golang/go-libp2p-perf --fake-crypto-seed --listen-address /ip4/0.0.0.0/tcp/9993 > /dev/null 2>&1 &
 
 sleep 1
@@ -26,7 +26,7 @@ echo "# Rust -> Golang"
 
 echo ""
 echo "# Golang -> Rust"
-./golang/go-libp2p-perf --server-address /ip4/127.0.0.1/tcp/9992/p2p/QmbftRvfmPkqdP9TonkM3VLHRM9prWqKg8cELfZCKVzb2q
+./golang/go-libp2p-perf --server-address /ip4/127.0.0.1/tcp/9992/p2p/Qmcqq9TFaYbb94uwdER1BXyGfCFY4Bb1gKozxNyVvLvTSw
 
 
 echo ""

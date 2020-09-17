@@ -1,4 +1,3 @@
 /rust/target
-/rust/private.*
 golang/go-libp2p-perf
 Cargo.lock
