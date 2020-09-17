@@ -4,6 +4,7 @@ use libp2p::swarm::SwarmBuilder;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
 use libp2p_perf::{build_transport, Executor, Perf};
 use std::task::Poll;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -14,6 +15,9 @@ use structopt::StructOpt;
 struct Opt {
     #[structopt(long)]
     listen_address: Multiaddr,
+
+    #[structopt(long)]
+    private_key_pkcs8: Option<PathBuf>,
 }
 
 #[async_std::main]
@@ -21,7 +25,12 @@ async fn main() {
     env_logger::init();
     let opt = Opt::from_args();
 
-    let key = identity::Keypair::generate_ed25519();
+    let key = if let Some(path) = opt.private_key_pkcs8 {
+        let mut bytes = std::fs::read(path).unwrap();
+        identity::Keypair::rsa_from_pkcs8(&mut bytes).unwrap()
+    } else {
+        identity::Keypair::generate_ed25519()
+    };
     let local_peer_id = PeerId::from(key.public());
 
     let transport = build_transport(key).unwrap();
