@@ -3,6 +3,7 @@ use futures::prelude::*;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
 use libp2p_perf::{build_transport, Executor, Perf};
+use log::{warn};
 use std::task::Poll;
 use structopt::StructOpt;
 
@@ -30,7 +31,14 @@ async fn main() {
         .executor(Box::new(Executor {}))
         .build();
 
-    Swarm::dial_addr(&mut client, opt.server_address).unwrap();
+    // Hack as Swarm::dial_addr does not accept Multiaddr with PeerId.
+    let mut server_address = opt.server_address;
+    if matches!(server_address.iter().last(), Some(libp2p::core::multiaddr::Protocol::P2p(_))) {
+        warn!("Ignoring provided PeerId.");
+        server_address.pop().unwrap();
+    } 
+
+    Swarm::dial_addr(&mut client, server_address).unwrap();
 
     poll_fn(|cx| match client.poll_next_unpin(cx) {
         Poll::Ready(Some(e)) => {
