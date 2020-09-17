@@ -3,8 +3,8 @@ use futures::prelude::*;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
 use libp2p_perf::{build_transport, Executor, Perf};
-use std::task::Poll;
 use std::path::PathBuf;
+use std::task::Poll;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
