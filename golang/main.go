@@ -24,7 +24,7 @@ const PROTOCOL_NAME = "/perf/0.1.0"
 var MSG = make([]byte, BUFFER_SIZE)
 
 func main() {
-	target := flag.String("d", "", "target peer to dial")
+	target := flag.String("server-address", "", "")
 	flag.Parse()
 
 	priv, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
@@ -48,8 +48,6 @@ func main() {
 	addr := basicHost.Addrs()[0]
 	fullAddr := addr.Encapsulate(hostAddr)
 
-	log.Printf("Now run \"./echo -d %s\" on a different terminal\n", fullAddr)
-
 	basicHost.SetStreamHandler(PROTOCOL_NAME, func(s network.Stream) {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
@@ -61,7 +59,8 @@ func main() {
 
 	// In case binary runs as a server.
 	if *target == "" {
-		log.Println("listening for connections")
+		log.Printf("Now run \"./go-libp2p-perf --server-address %s\" on a different terminal.\n", fullAddr)
+		log.Println("Listening for connections.")
 		select {} // hang forever
 	}
 
