@@ -25,6 +25,7 @@ var MSG = make([]byte, BUFFER_SIZE)
 
 func main() {
 	target := flag.String("server-address", "", "")
+	listenAddr := flag.String("listen-address", "", "")
 	flag.Parse()
 
 	priv, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
@@ -32,9 +33,13 @@ func main() {
 		panic(err)
 	}
 
+	if *listenAddr == "" {
+		*listenAddr = "/ip4/127.0.0.1/tcp/0"
+	}
+
 	opts := []libp2p.Option{
 		libp2p.Security(noise.ID, noise.New),
-		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", 0)),
+		libp2p.ListenAddrStrings(*listenAddr),
 		libp2p.Identity(priv),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 	}
