@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	mrand "math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -26,11 +27,21 @@ var MSG = make([]byte, BUFFER_SIZE)
 func main() {
 	target := flag.String("server-address", "", "")
 	listenAddr := flag.String("listen-address", "", "")
+	fakeCryptoSeed := flag.Bool("fake-crypto-seed", false, "")
 	flag.Parse()
 
-	priv, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
-	if err != nil {
-		panic(err)
+	var priv crypto.PrivKey
+	var err error
+	if *fakeCryptoSeed {
+		priv, _, err = crypto.GenerateKeyPairWithReader(crypto.Ed25519, 256, mrand.New(mrand.NewSource(0)))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		priv, _, err = crypto.GenerateKeyPair(crypto.RSA, 2048)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if *listenAddr == "" {
@@ -49,10 +60,6 @@ func main() {
 		panic(err)
 	}
 
-	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", basicHost.ID().Pretty()))
-	addr := basicHost.Addrs()[0]
-	fullAddr := addr.Encapsulate(hostAddr)
-
 	basicHost.SetStreamHandler(PROTOCOL_NAME, func(s network.Stream) {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
@@ -64,19 +71,21 @@ func main() {
 
 	// In case binary runs as a server.
 	if *target == "" {
+		hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", basicHost.ID()))
+		addr := basicHost.Addrs()[0]
+		fullAddr := addr.Encapsulate(hostAddr)
 		log.Printf("Now run \"./go-libp2p-perf --server-address %s\" on a different terminal.\n", fullAddr)
-		log.Println("Listening for connections.")
 		select {} // hang forever
 	}
 
 	// The following code extracts target's the peer ID from the
 	// given multiaddress
-	ipfsaddr, err := ma.NewMultiaddr(*target)
+	targetAddr, err := ma.NewMultiaddr(*target)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	pid, err := ipfsaddr.ValueForProtocol(ma.P_IPFS)
+	pid, err := targetAddr.ValueForProtocol(ma.P_IPFS)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -88,8 +97,8 @@ func main() {
 
 	// Decapsulate the /ipfs/<peerID> part from the target
 	// /ip4/<a.b.c.d>/ipfs/<peer> becomes /ip4/<a.b.c.d>
-	targetPeerAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", pid))
-	targetAddr := ipfsaddr.Decapsulate(targetPeerAddr)
+	targetP2PAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", pid))
+	targetAddr = targetAddr.Decapsulate(targetP2PAddr)
 
 	// We have a peer ID and a targetAddr so we add it to the peerstore
 	// so LibP2P knows how to contact it
