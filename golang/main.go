@@ -126,13 +126,15 @@ func main() {
 
 func handleIncomingPerfRun(s network.Stream) error {
 	var err error
+	var n int
+
 	start := time.Now()
 	transfered := 0
 	buf := make([]byte, BUFFER_SIZE)
 
 	for err == nil {
-		_, err = io.ReadFull(s, buf)
-		transfered += BUFFER_SIZE
+		n, err = io.Reader.Read(s, buf)
+		transfered += n
 	}
 
 	printRun(start, transfered)
@@ -142,7 +144,7 @@ func handleIncomingPerfRun(s network.Stream) error {
 
 func printRun(start time.Time, transfered int) {
 	fmt.Printf(
-		"Interval \tTransfer\tBandwidth\n0s - %.2f s \t%d MBytes\t %.2f MBit/s\n",
+		"Interval \tTransfer\tBandwidth\n0s - %.2f s \t%d MBytes\t%.2f MBit/s\n",
 		time.Now().Sub(start).Seconds(),
 		transfered/1000/1000,
 		float64(transfered/1000/1000*8)/time.Now().Sub(start).Seconds(),

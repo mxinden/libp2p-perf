@@ -1,4 +1,3 @@
-use bytes::{Bytes, BytesMut};
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use libp2p::{
@@ -52,7 +51,7 @@ enum PerfRun<I, O> {
         transfered: usize,
         substream: PerfRunStream<I, O>,
     },
-    Closing {
+    ClosingWriter {
         duration: Duration,
         transfered: usize,
         substream: O,
@@ -75,14 +74,17 @@ impl<I, O> PerfRun<I, O> {
 }
 
 enum PerfRunStream<I, O> {
-    Receiver(I),
+    // Receiver + void buffer.
+    Receiver(I, Vec<u8>),
     Sender(O),
 }
 
 impl<I, O> Unpin for PerfRun<I, O> {}
 
-impl<I: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin, O: Sink<Bytes> + Unpin> Future
-    for PerfRun<I, O>
+impl<I, O> Future for PerfRun<I, O>
+where
+    I: AsyncRead + AsyncWrite + Unpin,
+    O: AsyncRead + AsyncWrite + Unpin,
 {
     type Output = (Duration, usize);
 
@@ -90,109 +92,102 @@ impl<I: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin, O: Sink<Bytes> 
         loop {
             match std::mem::replace(&mut *self, PerfRun::Poisoned) {
                 PerfRun::Running {
-                    start,
+                    mut start,
                     transfered,
                     substream: PerfRunStream::Sender(mut substream),
                 } => {
-                    if let Some(start) = start {
-                        if start.elapsed() >= Duration::from_secs(10) {
-                            // TODO: Do we need a closing to flush?
-                            *self = PerfRun::Closing {
-                                duration: start.elapsed(),
-                                transfered,
-                                substream,
-                            };
-
-                            continue;
-                        }
-                    }
-
-                    if let Poll::Pending = substream.poll_ready_unpin(cx) {
-                        *self = PerfRun::Running {
-                            start,
-                            transfered,
-                            substream: PerfRunStream::Sender(substream),
-                        };
-                        return Poll::Pending;
-                    }
-
-                    let start = start.or_else(|| Some(Instant::now()));
-
-                    if substream.start_send_unpin(Bytes::from(MSG)).is_err() {
-                        panic!("sending failed");
-                    }
-
-                    let transfered = transfered + BUFFER_SIZE;
-
-                    *self = PerfRun::Running {
-                        start,
-                        transfered,
-                        substream: PerfRunStream::Sender(substream),
-                    };
-                }
-                PerfRun::Running {
-                    start,
-                    transfered,
-                    substream: PerfRunStream::Receiver(mut substream),
-                } => match substream.poll_next_unpin(cx) {
-                    Poll::Ready(Some(msg)) => {
-                        let start = start.or_else(|| Some(Instant::now()));
-                        let len = msg.unwrap().len();
-                        let transfered = transfered + len;
-
-                        *self = PerfRun::Running {
-                            start,
-                            transfered,
-                            substream: PerfRunStream::Receiver(substream),
-                        };
-                    }
-                    Poll::Ready(None) => {
-                        *self = PerfRun::Done {
-                            duration: start.unwrap().elapsed(),
-                            transfered,
-                        };
-
-                        continue;
-                    }
-                    Poll::Pending => {
-                        *self = PerfRun::Running {
-                            start,
-                            transfered,
-                            substream: PerfRunStream::Receiver(substream),
-                        };
-                        return Poll::Pending;
-                    }
-                },
-                PerfRun::Closing {
-                    duration,
-                    transfered,
-                    mut substream,
-                } => match substream.poll_flush_unpin(cx) {
-                    Poll::Ready(Ok(())) => {
-                        match substream.poll_close_unpin(cx) {
-                            Poll::Ready(Ok(())) => {}
-                            Poll::Ready(Err(_)) => panic!("Failed to close connection"),
-                            Poll::Pending => {
-                                *self = PerfRun::Closing {
-                                    duration,
+                    match start {
+                        Some(start) => {
+                            if start.elapsed() >= Duration::from_secs(10) {
+                                *self = PerfRun::ClosingWriter {
+                                    duration: start.elapsed(),
                                     transfered,
                                     substream,
                                 };
 
-                                return Poll::Pending;
+                                continue;
                             }
-                        };
-                        drop(substream);
-                        std::thread::sleep(Duration::from_secs(1));
-                        *self = PerfRun::Done {
-                            duration,
-                            transfered,
-                        };
-                        continue;
+                        }
+                        None => start = Some(Instant::now()),
                     }
+
+                    match Pin::new(&mut substream).poll_write(cx, MSG) {
+                        Poll::Ready(Ok(n)) => {
+                            *self = PerfRun::Running {
+                                start,
+                                transfered: transfered + n,
+                                substream: PerfRunStream::Sender(substream),
+                            };
+                        }
+                        Poll::Ready(Err(e)) => panic!("Unexpected error {:?}", e),
+                        Poll::Pending => {
+                            *self = PerfRun::Running {
+                                start,
+                                transfered,
+                                substream: PerfRunStream::Sender(substream),
+                            };
+                            return Poll::Pending;
+                        }
+                    }
+                }
+                PerfRun::Running {
+                    start,
+                    transfered,
+                    substream: PerfRunStream::Receiver(mut substream, mut void_buf),
+                } => match Pin::new(&mut substream).poll_read(cx, &mut void_buf) {
+                    Poll::Ready(Ok(n)) => {
+                        *self = PerfRun::Running {
+                            start,
+                            transfered: transfered + n,
+                            substream: PerfRunStream::Receiver(substream, void_buf),
+                        };
+                    }
+                    Poll::Ready(Err(e)) => {
+                        if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                            *self = PerfRun::Done {
+                                duration: start.unwrap().elapsed(),
+                                transfered,
+                            };
+                        } else {
+                            panic!("Unexpected error {:?}", e);
+                        }
+                    }
+                    Poll::Pending => {
+                        *self = PerfRun::Running {
+                            start,
+                            transfered,
+                            substream: PerfRunStream::Receiver(substream, void_buf),
+                        };
+                        return Poll::Pending;
+                    }
+                },
+                PerfRun::ClosingWriter {
+                    duration,
+                    transfered,
+                    mut substream,
+                } => match Pin::new(&mut substream).poll_flush(cx) {
+                    Poll::Ready(Ok(())) => match Pin::new(&mut substream).poll_close(cx) {
+                        Poll::Ready(Ok(())) => {
+                            drop(substream);
+                            std::thread::sleep(Duration::from_secs(1));
+                            *self = PerfRun::Done {
+                                duration,
+                                transfered,
+                            };
+                        }
+                        Poll::Ready(Err(_)) => panic!("Failed to close connection"),
+                        Poll::Pending => {
+                            *self = PerfRun::ClosingWriter {
+                                duration,
+                                transfered,
+                                substream,
+                            };
+                            return Poll::Pending;
+                        }
+                    },
                     Poll::Ready(Err(_)) => panic!("Got error while closing substream"),
                     Poll::Pending => {
-                        *self = PerfRun::Closing {
+                        *self = PerfRun::ClosingWriter {
                             duration,
                             transfered,
                             substream,
@@ -253,8 +248,10 @@ impl ProtocolsHandler for PerfHandler {
         substream: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
         _info: Self::InboundOpenInfo,
     ) {
-        self.perf_runs
-            .push(PerfRun::new(PerfRunStream::Receiver(substream)));
+        self.perf_runs.push(PerfRun::new(PerfRunStream::Receiver(
+            substream,
+            vec![0; BUFFER_SIZE],
+        )));
     }
 
     /// Injects the output of a successful upgrade on a new outbound substream.
