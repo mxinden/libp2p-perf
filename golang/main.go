@@ -64,7 +64,7 @@ func main() {
 	basicHost.SetStreamHandler(PROTOCOL_NAME, func(s network.Stream) {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
-			s.Reset()
+			s.Close()
 		} else {
 			s.Close()
 		}
