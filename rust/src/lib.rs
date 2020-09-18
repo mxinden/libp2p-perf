@@ -87,15 +87,15 @@ pub fn build_transport(
     Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
         .upgrade(core::upgrade::Version::V1)
         .authenticate(
-            noise::NoiseConfig::xx(
-                noise::Keypair::<noise::X25519Spec>::new()
-                    .into_authentic(&keypair)
-                    .unwrap(),
-            )
-            .into_authenticated(),
-            // libp2p::plaintext::PlainText2Config {
-            //     local_public_key: keypair.public(),
-            // }
+            // noise::NoiseConfig::xx(
+            //     noise::Keypair::<noise::X25519Spec>::new()
+            //         .into_authentic(&keypair)
+            //         .unwrap(),
+            // )
+            // .into_authenticated(),
+            libp2p::plaintext::PlainText2Config {
+                local_public_key: keypair.public(),
+            }
         )
         .multiplex(yamux_config)
         .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))

@@ -14,7 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	noise "github.com/libp2p/go-libp2p-noise"
+	// noise "github.com/libp2p/go-libp2p-noise"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -49,7 +49,8 @@ func main() {
 	}
 
 	opts := []libp2p.Option{
-		libp2p.Security(noise.ID, noise.New),
+		// libp2p.Security(noise.ID, noise.New),
+		libp2p.NoSecurity,
 		libp2p.ListenAddrStrings(*listenAddr),
 		libp2p.Identity(priv),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
