@@ -81,8 +81,11 @@ pub fn build_transport(
     // $ cargo run --bin client --release -- --server-address /ip4/127.0.0.1/tcp/9992
     // Interval        Transfer        Bandwidth
     // 0 s - 10.00 s   614 MBytes      491.19 MBit/s
-    // yamux_config.set_receive_window(6_291_456);
-    // yamux_config.set_max_buffer_size(6_291_456);
+    //
+    // Set to golang default of 16MiB
+    // (https://github.com/libp2p/go-libp2p-yamux/blob/35d571287404f972dc626e2de2980ef2c8178b26/transport.go#L15).
+    yamux_config.set_receive_window(16 * 1024 * 1024);
+    yamux_config.set_max_buffer_size(16 * 1024 * 1024);
 
     Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
         .upgrade(core::upgrade::Version::V1)
@@ -95,7 +98,7 @@ pub fn build_transport(
             // .into_authenticated(),
             libp2p::plaintext::PlainText2Config {
                 local_public_key: keypair.public(),
-            }
+            },
         )
         .multiplex(yamux_config)
         .map(|(peer, muxer), _| (peer, core::muxing::StreamMuxerBox::new(muxer))))

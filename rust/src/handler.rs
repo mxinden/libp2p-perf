@@ -171,7 +171,16 @@ impl<I: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin, O: Sink<Bytes> 
                     Poll::Ready(Ok(())) => {
                         match substream.poll_close_unpin(cx) {
                             Poll::Ready(Ok(())) => {}
-                            _ => panic!("unxpected"),
+                            Poll::Ready(Err(_)) => panic!("Failed to close connection"),
+                            Poll::Pending => {
+                                *self = PerfRun::Closing {
+                                    duration,
+                                    transfered,
+                                    substream,
+                                };
+
+                                return Poll::Pending;
+                            }
                         };
                         drop(substream);
                         std::thread::sleep(Duration::from_secs(1));
