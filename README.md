@@ -23,19 +23,19 @@ $ ./run.sh
 
 # Rust -> Rust
 Interval        Transfer        Bandwidth
-0 s - 10.00 s   701 MBytes      560.79 MBit/s
+0 s - 10.00 s   11979 MBytes    9582.07 MBit/s
 
 # Rust -> Golang
 Interval        Transfer        Bandwidth
-0 s - 10.00 s   8489 MBytes     6789.88 MBit/s
+0 s - 10.00 s   21848 MBytes    17478.22 MBit/s
 
 # Golang -> Rust
 Interval        Transfer        Bandwidth
-0s - 10.10 s    107 MBytes       84.79 MBit/s
+0s - 10.61 s    117 MBytes       88.21 MBit/s
 
 # Golang -> Golang
 Interval        Transfer        Bandwidth
-0s - 10.00 s    9020 MBytes      7215.98 MBit/s
+0s - 10.00 s    22995 MBytes     18392.86 MBit/s
 
 
 $ cat /proc/cpuinfo | grep "model name" | head -1
