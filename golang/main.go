@@ -119,6 +119,7 @@ func main() {
 		}
 		transfered += BUFFER_SIZE
 	}
+	s.Close()
 
 	printRun(start, transfered)
 }
