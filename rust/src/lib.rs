@@ -4,21 +4,10 @@ mod protocol;
 
 pub use behaviour::{Perf, PerfEvent};
 
-use futures::future::Future;
-use libp2p::core::Executor as TExecutor;
 use libp2p::{
     core::{self, Transport},
     dns, identity, noise, tcp, yamux, PeerId,
 };
-use std::pin::Pin;
-
-pub struct Executor {}
-
-impl TExecutor for Executor {
-    fn exec(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
-        async_std::task::spawn(future);
-    }
-}
 
 pub fn build_transport(
     keypair: identity::Keypair,

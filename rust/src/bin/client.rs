@@ -2,7 +2,7 @@ use futures::future::poll_fn;
 use futures::prelude::*;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
-use libp2p_perf::{build_transport, Executor, Perf};
+use libp2p_perf::{build_transport, Perf};
 use log::warn;
 use std::task::Poll;
 use structopt::StructOpt;
@@ -28,7 +28,7 @@ async fn main() {
     let transport = build_transport(key).unwrap();
     let perf = Perf::default();
     let mut client = SwarmBuilder::new(transport, perf, local_peer_id)
-        .executor(Box::new(Executor {}))
+        .executor(Box::new(|f| { async_std::task::spawn(f); }))
         .build();
 
     // Hack as Swarm::dial_addr does not accept Multiaddr with PeerId.
