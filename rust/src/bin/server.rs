@@ -2,7 +2,7 @@ use futures::future::poll_fn;
 use futures::prelude::*;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{identity, Multiaddr, PeerId, Swarm};
-use libp2p_perf::{build_transport, Perf};
+use libp2p_perf::{build_transport, Perf, TransportSecurity};
 use std::path::PathBuf;
 use std::task::Poll;
 use structopt::StructOpt;
@@ -33,10 +33,12 @@ async fn main() {
     };
     let local_peer_id = PeerId::from(key.public());
 
-    let transport = build_transport(key).unwrap();
+    let transport = build_transport(key, TransportSecurity::All).unwrap();
     let perf = Perf::default();
     let mut server = SwarmBuilder::new(transport, perf, local_peer_id.clone())
-        .executor(Box::new(|f| { async_std::task::spawn(f); }))
+        .executor(Box::new(|f| {
+            async_std::task::spawn(f);
+        }))
         .build();
 
     Swarm::listen_on(&mut server, opt.listen_address).unwrap();
