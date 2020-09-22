@@ -14,7 +14,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	// noise "github.com/libp2p/go-libp2p-noise"
+	noise "github.com/libp2p/go-libp2p-noise"
 	yamux "github.com/libp2p/go-libp2p-yamux"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -28,12 +28,25 @@ func main() {
 	target := flag.String("server-address", "", "")
 	listenAddr := flag.String("listen-address", "", "")
 	fakeCryptoSeed := flag.Bool("fake-crypto-seed", false, "")
+	transportSecurity := flag.String(
+		"transport-security",
+		"noise",
+		"Mechanism to secure transport, either 'noise' or 'plaintext'.",
+	)
 	flag.Parse()
+
+	if *listenAddr == "" {
+		*listenAddr = "/ip4/127.0.0.1/tcp/0"
+	}
 
 	var priv crypto.PrivKey
 	var err error
 	if *fakeCryptoSeed {
-		priv, _, err = crypto.GenerateKeyPairWithReader(crypto.Ed25519, 256, mrand.New(mrand.NewSource(0)))
+		priv, _, err = crypto.GenerateKeyPairWithReader(
+			crypto.Ed25519,
+			256,
+			mrand.New(mrand.NewSource(0)),
+		)
 		if err != nil {
 			panic(err)
 		}
@@ -44,16 +57,16 @@ func main() {
 		}
 	}
 
-	if *listenAddr == "" {
-		*listenAddr = "/ip4/127.0.0.1/tcp/0"
-	}
-
 	opts := []libp2p.Option{
-		// libp2p.Security(noise.ID, noise.New),
-		libp2p.NoSecurity,
 		libp2p.ListenAddrStrings(*listenAddr),
 		libp2p.Identity(priv),
 		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
+	}
+
+	if *transportSecurity == "noise" || *transportSecurity == "" {
+		opts = append(opts, libp2p.Security(noise.ID, noise.New))
+	} else if *transportSecurity == "plaintext" {
+		opts = append(opts, libp2p.NoSecurity)
 	}
 
 	basicHost, err := libp2p.New(context.Background(), opts...)
