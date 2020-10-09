@@ -23,17 +23,17 @@ echo "# Rust -> Rust"
 for Protocol in ${TransportSecurityProtocols[*]}
 do
     echo
-    echo "## Transport protocol $Protocol"
+    echo "## Transport security $Protocol"
     ./rust/target/release/client --server-address /ip4/127.0.0.1/tcp/9992 --transport-security $Protocol
 done
 
 echo
 echo "# Rust -> Golang"
 echo
-echo "## Transport protocol noise"
+echo "## Transport security noise"
 ./rust/target/release/client --server-address /ip4/127.0.0.1/tcp/9993 --transport-security noise
 echo
-echo "## Transport protocol plaintext"
+echo "## Transport security plaintext"
 ./rust/target/release/client --server-address /ip4/127.0.0.1/tcp/9994 --transport-security plaintext
 
 echo
@@ -41,16 +41,16 @@ echo "# Golang -> Rust"
 for Protocol in ${TransportSecurityProtocols[*]}
 do
     echo
-    echo "## Transport protocol $Protocol"
+    echo "## Transport security $Protocol"
     ./golang/go-libp2p-perf --server-address /ip4/127.0.0.1/tcp/9992/p2p/Qmcqq9TFaYbb94uwdER1BXyGfCFY4Bb1gKozxNyVvLvTSw --transport-security $Protocol
 done
 
 echo
 echo "# Golang -> Golang"
 echo
-echo "## Transport protocol noise"
+echo "## Transport security noise"
 ./golang/go-libp2p-perf --server-address /ip4/127.0.0.1/tcp/9993/p2p/12D3KooWL3XJ9EMCyZvmmGXL2LMiVBtrVa2BuESsJiXkSj7333Jw --transport-security noise
 echo
-echo "## Transport protocol plaintext"
+echo "## Transport security plaintext"
 ./golang/go-libp2p-perf --server-address /ip4/127.0.0.1/tcp/9994/p2p/12D3KooWL3XJ9EMCyZvmmGXL2LMiVBtrVa2BuESsJiXkSj7333Jw --transport-security plaintext
 
