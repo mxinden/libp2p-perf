@@ -136,22 +136,20 @@ where
                     substream: PerfRunStream::Receiver(mut substream, mut void_buf),
                 } => match Pin::new(&mut substream).poll_read(cx, &mut void_buf) {
                     Poll::Ready(Ok(n)) => {
-                        *self = PerfRun::Running {
-                            start,
-                            transfered: transfered + n,
-                            substream: PerfRunStream::Receiver(substream, void_buf),
-                        };
-                    }
-                    Poll::Ready(Err(e)) => {
-                        if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                        if n == 0 {
                             *self = PerfRun::Done {
                                 duration: start.unwrap().elapsed(),
                                 transfered,
                             };
                         } else {
-                            panic!("Unexpected error {:?}", e);
+                            *self = PerfRun::Running {
+                                start,
+                                transfered: transfered + n,
+                                substream: PerfRunStream::Receiver(substream, void_buf),
+                            };
                         }
                     }
+                    Poll::Ready(Err(e)) => panic!("Unexpected error {:?}", e),
                     Poll::Pending => {
                         *self = PerfRun::Running {
                             start,

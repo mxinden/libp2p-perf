@@ -23,43 +23,43 @@ $ ./run.sh
 
 # Rust -> Rust
 
-## Transport protocol noise
+## Transport security noise
 Interval        Transfer        Bandwidth
-0 s - 10.06 s   1862 MBytes     1480.67 MBit/s
+0 s - 10.00 s   2051 MBytes     1640.60 MBit/s
 
-## Transport protocol plaintext
+## Transport security plaintext
 Interval        Transfer        Bandwidth
-0 s - 10.00 s   10267 MBytes    8209.56 MBit/s
+0 s - 10.00 s   4070 MBytes     3255.99 MBit/s
 
 # Rust -> Golang
 
-## Transport protocol noise
+## Transport security noise
 Interval        Transfer        Bandwidth
-0 s - 10.00 s   7740 MBytes     6191.96 MBit/s
+0 s - 10.00 s   10897 MBytes    8716.59 MBit/s
 
-## Transport protocol plaintext
+## Transport security plaintext
 Interval        Transfer        Bandwidth
-0 s - 10.00 s   17588 MBytes    14070.39 MBit/s
+0 s - 10.00 s   16498 MBytes    13198.34 MBit/s
 
 # Golang -> Rust
 
-## Transport protocol noise
+## Transport security noise
 Interval        Transfer        Bandwidth
-0s - 10.03 s    2349 MBytes     1873.96 MBit/s
+0s - 10.04 s    1980 MBytes     1577.01 MBit/s
 
-## Transport protocol plaintext
+## Transport security plaintext
 Interval        Transfer        Bandwidth
-0s - 10.00 s    17213 MBytes    13768.89 MBit/s
+0s - 10.00 s    25149 MBytes    20117.33 MBit/s
 
 # Golang -> Golang
 
-## Transport protocol noise
+## Transport security noise
 Interval        Transfer        Bandwidth
-0s - 10.00 s    5983 MBytes     4786.30 MBit/s
+0s - 10.00 s    9108 MBytes     7285.87 MBit/s
 
-## Transport protocol plaintext
+## Transport security plaintext
 Interval        Transfer        Bandwidth
-0s - 10.00 s    21399 MBytes    17115.38 MBit/s
+0s - 10.00 s    26805 MBytes    21441.36 MBit/s
 
 
 $ cat /proc/cpuinfo | grep "model name" | head -1
