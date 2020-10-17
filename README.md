@@ -5,11 +5,29 @@
 The [iPerf](https://en.wikipedia.org/wiki/Iperf) equivalent for the libp2p
 ecosystem.
 
+In a nutshell a **client** sends as much data as possible through a single
+multiplexed stream to a **server** which reads and discards all received data.
+The client closes the stream after 10 seconds. Subsequently both the client and
+the server print the result as the total number of bytes transferred and the
+corresponding bandwidth on stdout.
+
 ## Implementations
 
 - Golang
 
+    - Transport: Tcp
+
+    - Transport security: Noise or Plaintext
+
+    - Multiplexing: Yamux
+
 - Rust
+
+    - Transport: Tcp
+
+    - Transport security: Noise or Plaintext
+
+    - Multiplexing: Yamux
 
 
 ## Getting started
