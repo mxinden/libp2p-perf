@@ -11,6 +11,7 @@ The client closes the stream after 10 seconds. Subsequently both the client and
 the server print the result as the total number of bytes transferred and the
 corresponding bandwidth on stdout.
 
+
 ## Implementations
 
 - Golang
@@ -83,3 +84,13 @@ Interval        Transfer        Bandwidth
 $ cat /proc/cpuinfo | grep "model name" | head -1
 model name      : Intel(R) Core(TM) i7-8550U CPU @ 1.80GHz
 ```
+
+
+## License
+
+Licensed under either of
+
+ * MIT license - <http://opensource.org/licenses/MIT>
+ * Apache License, Version 2.0 - <http://www.apache.org/licenses/LICENSE-2.0>
+
+at your option.
