@@ -8,6 +8,7 @@ use libp2p::{
     core::{
         self,
         either::EitherOutput,
+        muxing::StreamMuxerBox,
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
         Transport,
     },
@@ -45,23 +46,7 @@ impl std::fmt::Display for TransportSecurity {
 pub fn build_transport(
     keypair: identity::Keypair,
     transport_security: TransportSecurity,
-) -> std::io::Result<
-    impl Transport<
-            Output = (
-                PeerId,
-                impl core::muxing::StreamMuxer<
-                        OutboundSubstream = impl Send,
-                        Substream = impl Send,
-                        Error = impl Into<std::io::Error>,
-                    > + Send
-                    + Sync,
-            ),
-            Error = impl std::error::Error + Send,
-            Listener = impl Send,
-            Dial = impl Send,
-            ListenerUpgrade = impl Send,
-        > + Clone,
-> {
+) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
     let mut yamux_config = yamux::Config::default();
     yamux_config.set_window_update_mode(yamux::WindowUpdateMode::OnRead);
 
@@ -164,7 +149,8 @@ pub fn build_transport(
                 }),
         )
         .multiplex(yamux_config)
-        .map(|(peer, muxer), _| (peer, muxer)))
+        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
+        .boxed())
 }
 
 #[cfg(test)]
