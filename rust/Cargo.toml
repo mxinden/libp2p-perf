@@ -14,7 +14,7 @@ unsigned-varint = { version = "0.5", features = ["futures-codec"] }
 async-std = { version = "1.6.2", features = ["attributes"] }
 bytes = "0.5.5"
 structopt = "0.3"
-env_logger = "0.7.1"
+env_logger = "0.8.1"
 log = "0.4"
 
 [dev-dependencies]
