@@ -29,6 +29,7 @@ async fn main() {
     let local_peer_id = PeerId::from(key.public());
 
     let transport = build_transport(
+        false,
         key,
         opt.transport_security.unwrap_or(TransportSecurity::Noise),
     )
