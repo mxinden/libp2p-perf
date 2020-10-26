@@ -33,7 +33,7 @@ async fn main() {
     };
     let local_peer_id = PeerId::from(key.public());
 
-    let transport = build_transport(key, TransportSecurity::All).unwrap();
+    let transport = build_transport(false, key, TransportSecurity::All).unwrap();
     let perf = Perf::default();
     let mut server = SwarmBuilder::new(transport, perf, local_peer_id.clone())
         .executor(Box::new(|f| {

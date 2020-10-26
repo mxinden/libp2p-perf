@@ -131,11 +131,12 @@ where
                     }
                 }
                 PerfRun::Running {
-                    start,
+                    mut start,
                     transfered,
                     substream: PerfRunStream::Receiver(mut substream, mut void_buf),
                 } => match Pin::new(&mut substream).poll_read(cx, &mut void_buf) {
                     Poll::Ready(Ok(n)) => {
+                        start = start.or(Some(Instant::now()));
                         if n == 0 {
                             *self = PerfRun::Done {
                                 duration: start.unwrap().elapsed(),

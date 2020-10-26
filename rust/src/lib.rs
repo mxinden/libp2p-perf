@@ -7,10 +7,10 @@ pub use behaviour::{Perf, PerfEvent};
 use libp2p::{
     core::{
         self,
-        either::EitherOutput,
+        either::{EitherOutput, EitherTransport},
         muxing::StreamMuxerBox,
+        transport::{MemoryTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
-        Transport,
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
@@ -44,6 +44,7 @@ impl std::fmt::Display for TransportSecurity {
 }
 
 pub fn build_transport(
+    in_memory: bool,
     keypair: identity::Keypair,
     transport_security: TransportSecurity,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
@@ -135,7 +136,13 @@ pub fn build_transport(
         }
     };
 
-    Ok(dns::DnsConfig::new(tcp::TcpConfig::new())?
+    let transport = if in_memory {
+        EitherTransport::Left(MemoryTransport {})
+    } else {
+        EitherTransport::Right(dns::DnsConfig::new(tcp::TcpConfig::new())?)
+    };
+
+    Ok(transport
         .upgrade(core::upgrade::Version::V1)
         .authenticate(
             transport_security_config
@@ -158,7 +165,9 @@ mod tests {
     use super::*;
     use futures::future::poll_fn;
     use futures::prelude::*;
+    use libp2p::core::multiaddr::{Multiaddr, Protocol};
     use libp2p::Swarm;
+    use rand::random;
     use std::task::Poll;
     use std::time::Duration;
 
@@ -169,7 +178,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -178,13 +187,13 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
+        let receiver_address: Multiaddr = Protocol::Memory(random::<u64>()).into();
 
-        Swarm::listen_on(&mut sender, "/ip4/0.0.0.0/tcp/9991".parse().unwrap()).unwrap();
-        Swarm::listen_on(&mut receiver, "/ip4/0.0.0.0/tcp/9992".parse().unwrap()).unwrap();
+        Swarm::listen_on(&mut receiver, receiver_address.clone()).unwrap();
 
         // Wait for receiver to bind to port.
         async_std::task::block_on(poll_fn(|cx| -> Poll<()> {
@@ -201,7 +210,7 @@ mod tests {
             }
         }));
 
-        Swarm::dial_addr(&mut sender, "/ip4/127.0.0.1/tcp/9992".parse().unwrap()).unwrap();
+        Swarm::dial_addr(&mut sender, receiver_address).unwrap();
 
         let sender_task = async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
             match sender.poll_next_unpin(cx) {
