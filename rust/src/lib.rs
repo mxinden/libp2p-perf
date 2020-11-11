@@ -48,8 +48,8 @@ pub fn build_transport(
     keypair: identity::Keypair,
     transport_security: TransportSecurity,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
-    let mut yamux_config = yamux::Config::default();
-    yamux_config.set_window_update_mode(yamux::WindowUpdateMode::OnRead);
+    let mut yamux_config = yamux::YamuxConfig::default();
+    yamux_config.set_window_update_mode(yamux::WindowUpdateMode::on_read());
 
     // The default TCP receive window (minimum, default, maximum) on my OS
     // (Debian) is:
@@ -93,7 +93,7 @@ pub fn build_transport(
     //
     // Set to golang default of 16MiB
     // (https://github.com/libp2p/go-libp2p-yamux/blob/35d571287404f972dc626e2de2980ef2c8178b26/transport.go#L15).
-    yamux_config.set_receive_window(16 * 1024 * 1024);
+    yamux_config.set_receive_window_size(16 * 1024 * 1024);
     yamux_config.set_max_buffer_size(16 * 1024 * 1024);
 
     let transport_security_config = match transport_security {
