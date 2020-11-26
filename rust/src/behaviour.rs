@@ -110,7 +110,7 @@ impl NetworkBehaviour for Perf {
     }
 
     fn poll(&mut self, _cx: &mut Context, _params: &mut impl PollParameters)
--> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
+    -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
         if let Some(action) = self.outbox.pop() {
             return Poll::Ready(action);
         }
