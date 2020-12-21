@@ -18,7 +18,7 @@ env_logger = "0.8.1"
 log = "0.4"
 
 [dev-dependencies]
-rand = "0.7.2"
+rand = "0.8.0"
 
 # Include debugging symbols in release binary.
 [profile.release]
