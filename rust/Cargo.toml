@@ -12,7 +12,7 @@ futures_codec = "0.4"
 futures = "0.3.1"
 unsigned-varint = { version = "0.5", features = ["futures-codec"] }
 async-std = { version = "1.6.2", features = ["attributes"] }
-bytes = "0.6.0"
+bytes = "1.0.0"
 structopt = "0.3"
 env_logger = "0.8.1"
 log = "0.4"
