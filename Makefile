@@ -3,10 +3,10 @@ GO_SRC_FILES=$(shell find golang/* -type f | grep -v go-libp2p-perf)
 
 all: rust/target/release/server rust/target/release/client golang/go-libp2p-perf
 
-rust/target/release/server: $(RUST_SRC_FILES)
+rust/target/release/server: $(RUST_SRC_FILES) rust/Cargo.toml
 	cd rust && cargo build --release --bin server
 
-rust/target/release/client: $(RUST_SRC_FILES)
+rust/target/release/client: $(RUST_SRC_FILES) rust/Cargo.toml
 	cd rust && cargo build --release --bin client
 
 rust/test.pk8:
