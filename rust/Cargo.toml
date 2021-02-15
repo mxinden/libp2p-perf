@@ -22,6 +22,3 @@ rand = "0.8.0"
 # Include debugging symbols in release binary.
 [profile.release]
 debug = true
-
-[patch.crates-io]
-yamux = { path = "../../../paritytech/yamux" }
