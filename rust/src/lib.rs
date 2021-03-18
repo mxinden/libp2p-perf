@@ -140,7 +140,9 @@ pub fn build_transport(
     let transport = if in_memory {
         EitherTransport::Left(MemoryTransport {})
     } else {
-        EitherTransport::Right(block_on(dns::DnsConfig::system(tcp::TcpConfig::new().nodelay(true)))?)
+        EitherTransport::Right(block_on(dns::DnsConfig::system(
+            tcp::TcpConfig::new().nodelay(true),
+        ))?)
     };
 
     Ok(transport
