@@ -3,6 +3,7 @@ mod handler;
 mod protocol;
 
 pub use behaviour::{Perf, PerfEvent};
+use futures::executor::block_on;
 
 use libp2p::{
     core::{
@@ -139,7 +140,7 @@ pub fn build_transport(
     let transport = if in_memory {
         EitherTransport::Left(MemoryTransport {})
     } else {
-        EitherTransport::Right(dns::DnsConfig::new(tcp::TcpConfig::new().nodelay(true))?)
+        EitherTransport::Right(block_on(dns::DnsConfig::system(tcp::TcpConfig::new().nodelay(true)))?)
     };
 
     Ok(transport
