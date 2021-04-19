@@ -95,9 +95,9 @@ impl NetworkBehaviour for Perf {
         panic!("inject dial failure");
     }
 
-    fn inject_new_listen_addr(&mut self, _addr: &Multiaddr) {}
+    fn inject_new_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}
 
-    fn inject_expired_listen_addr(&mut self, _addr: &Multiaddr) {}
+    fn inject_expired_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}
 
     fn inject_new_external_addr(&mut self, _addr: &Multiaddr) {}
 
