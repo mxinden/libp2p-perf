@@ -41,12 +41,12 @@ async fn main() {
         }))
         .build();
 
-    Swarm::listen_on(&mut server, opt.listen_address).unwrap();
+    server.listen_on(opt.listen_address).unwrap();
     let mut listening = false;
 
     poll_fn(|cx| loop {
         match server.poll_next_unpin(cx) {
-            Poll::Ready(Some(e)) => println!("{}", e),
+            Poll::Ready(Some(e)) => println!("{:?}", e),
             Poll::Ready(None) => panic!("Unexpected server termination."),
             Poll::Pending => {
                 if !listening {

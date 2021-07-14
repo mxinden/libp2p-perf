@@ -166,17 +166,22 @@ pub fn build_transport(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::future::poll_fn;
+    use futures::executor::LocalPool;
+
     use futures::prelude::*;
+    use futures::stream::StreamExt;
+    use futures::task::Spawn;
     use libp2p::core::multiaddr::{Multiaddr, Protocol};
-    use libp2p::Swarm;
+    use libp2p::swarm::{Swarm, SwarmEvent};
     use rand::random;
-    use std::task::Poll;
+
     use std::time::Duration;
 
     #[test]
     fn it_works() {
+        let mut pool = LocalPool::new();
         let _ = env_logger::try_init();
+
         let mut sender = {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
@@ -196,52 +201,46 @@ mod tests {
         };
         let receiver_address: Multiaddr = Protocol::Memory(random::<u64>()).into();
 
-        Swarm::listen_on(&mut receiver, receiver_address.clone()).unwrap();
+        // Wait for receiver to bind to listen address.
+        pool.run_until(async {
+            let id = receiver.listen_on(receiver_address.clone()).unwrap();
+            match receiver.next().await.unwrap() {
+                SwarmEvent::NewListenAddr { listener_id, .. } if listener_id == id => {}
+                _ => panic!("Unexpected event."),
+            }
+        });
 
-        // Wait for receiver to bind to port.
-        async_std::task::block_on(poll_fn(|cx| -> Poll<()> {
-            match receiver.poll_next_unpin(cx) {
-                Poll::Ready(e) => panic!("{:?}", e),
-                Poll::Pending => {
-                    if let Some(a) = Swarm::listeners(&receiver).next() {
-                        println!("{:?}", a);
-                        return Poll::Ready(());
+        pool.spawner()
+            .spawn_obj(
+                async move {
+                    loop {
+                        receiver.next().await;
                     }
+                }
+                .boxed()
+                .into(),
+            )
+            .unwrap();
 
-                    Poll::Pending
+        sender.dial_addr(receiver_address).unwrap();
+
+        pool.run_until(async move {
+            loop {
+                match sender.next().await.unwrap() {
+                    SwarmEvent::Behaviour(PerfEvent::PerfRunDone(duration, _transfered)) => {
+                        if duration < Duration::from_secs(10) {
+                            panic!("Expected test to run at least 10 seconds.")
+                        }
+
+                        if duration > Duration::from_secs(11) {
+                            panic!("Expected test to run roughly 10 seconds.")
+                        }
+
+                        break;
+                    }
+                    _ => {}
                 }
             }
-        }));
-
-        Swarm::dial_addr(&mut sender, receiver_address).unwrap();
-
-        let sender_task = async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
-            match sender.poll_next_unpin(cx) {
-                Poll::Ready(Some(PerfEvent::PerfRunDone(duration, _transfered))) => {
-                    if duration < Duration::from_secs(10) {
-                        panic!("Expected test to run at least 10 seconds.")
-                    }
-
-                    if duration > Duration::from_secs(11) {
-                        panic!("Expected test to run roughly 10 seconds.")
-                    }
-
-                    Poll::Ready(())
-                }
-                Poll::Ready(None) => panic!("unexpected stream close"),
-                Poll::Pending => Poll::Pending,
-            }
-        }));
-
-        async_std::task::spawn(poll_fn(move |cx| -> Poll<()> {
-            receiver.poll_next_unpin(cx).map(|e| println!("{:?}", e))
-        }));
-
-        // Don't block on receiver task. When the sender drops the substream it
-        // itself is also dropped right afterwards. Thus the substream closing
-        // might not reach the receiver, but instead the receiver will just
-        // learn about the connection being closed. In that case the perfrun on
-        // the receiver side is never finished.
-        async_std::task::block_on(sender_task);
+        });
     }
 }
