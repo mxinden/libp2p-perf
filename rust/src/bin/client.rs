@@ -1,7 +1,7 @@
 use futures::future::poll_fn;
 use futures::prelude::*;
 use libp2p::swarm::SwarmBuilder;
-use libp2p::{identity, Multiaddr, PeerId, Swarm};
+use libp2p::{identity, Multiaddr, PeerId};
 use libp2p_perf::{build_transport, Perf, TransportSecurity};
 use log::warn;
 use std::task::Poll;
@@ -51,11 +51,11 @@ async fn main() {
         server_address.pop().unwrap();
     }
 
-    Swarm::dial_addr(&mut client, server_address).unwrap();
+    client.dial_addr(server_address).unwrap();
 
     poll_fn(|cx| match client.poll_next_unpin(cx) {
         Poll::Ready(Some(e)) => {
-            println!("{}", e);
+            println!("{:?}", e);
 
             // TODO: Fix hack
             //
