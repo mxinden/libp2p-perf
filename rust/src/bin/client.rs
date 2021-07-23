@@ -1,10 +1,8 @@
-use futures::future::poll_fn;
 use futures::prelude::*;
-use libp2p::swarm::SwarmBuilder;
+use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, Multiaddr, PeerId};
 use libp2p_perf::{build_transport, Perf, TransportSecurity};
 use log::warn;
-use std::task::Poll;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -53,21 +51,22 @@ async fn main() {
 
     client.dial_addr(server_address).unwrap();
 
-    poll_fn(|cx| match client.poll_next_unpin(cx) {
-        Poll::Ready(Some(e)) => {
-            println!("{:?}", e);
+    loop {
+        match client.next().await.expect("Infinite stream.") {
+            SwarmEvent::Behaviour(e) => {
+                println!("{}", e);
 
-            // TODO: Fix hack
-            //
-            // Performance run timer has already been stopped. Wait for a second
-            // to make sure the receiving side of the substream on the server is
-            // closed before the whole connection is dropped.
-            std::thread::sleep(std::time::Duration::from_secs(1));
+                // TODO: Fix hack
+                //
+                // Performance run timer has already been stopped. Wait for a second
+                // to make sure the receiving side of the substream on the server is
+                // closed before the whole connection is dropped.
+                std::thread::sleep(std::time::Duration::from_secs(1));
 
-            Poll::Ready(())
+                break;
+            }
+            SwarmEvent::ConnectionEstablished { .. } => {}
+            e => panic!("{:?}", e),
         }
-        Poll::Ready(None) => panic!("Client finished unexpectedly."),
-        Poll::Pending => Poll::Pending,
-    })
-    .await
+    }
 }
