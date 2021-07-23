@@ -18,7 +18,6 @@ jobs:
           go-version: "1.16.x"
       - name: Check that go.mod is tidy
         run: |
-          ls -la
           cd golang
           go mod tidy
           if [[ -n $(git ls-files --other --exclude-standard --directory -- go.sum) ]]; then
