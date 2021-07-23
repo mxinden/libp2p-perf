@@ -25,5 +25,4 @@ jobs:
           fi
           git diff --exit-code -- go.sum go.mod
       - name: Make
-        with:
-          run: make
+        run: make
