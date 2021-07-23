@@ -4,3 +4,7 @@ updates:
     directory: "/rust"
     schedule:
       interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/golang"
+    schedule:
+      interval: "daily"
