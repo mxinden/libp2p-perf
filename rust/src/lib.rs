@@ -10,11 +10,12 @@ use libp2p::{
         self,
         either::{EitherOutput, EitherTransport},
         muxing::StreamMuxerBox,
-        transport::{MemoryTransport, Transport},
+        transport::{choice::OrTransport, MemoryTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
+    quic::{Crypto, QuicConfig, QuicTransport, TlsCrypto, ToLibp2p},
     tcp, yamux, PeerId,
 };
 
@@ -49,117 +50,127 @@ pub fn build_transport(
     keypair: identity::Keypair,
     transport_security: TransportSecurity,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
-    let mut yamux_config = yamux::YamuxConfig::default();
-    yamux_config.set_window_update_mode(yamux::WindowUpdateMode::on_read());
+    let tcp_transport = {
+        let mut yamux_config = yamux::YamuxConfig::default();
+        yamux_config.set_window_update_mode(yamux::WindowUpdateMode::on_read());
 
-    // The default TCP receive window (minimum, default, maximum) on my OS
-    // (Debian) is:
-    //
-    // $ cat /proc/sys/net/ipv4/tcp_rmem
-    // 4096    131072  6291456
-    //
-    // Possible Bandwidth of a connection ignoring all overheads of TCP would be
-    // calculated with:
-    //
-    // Bandwidth (mBit/s) = (Receive window in bit) / (latency in s) / 1_000_000
-    //
-    // Ping latency via `localhost` is around 0.09 ms:
-    //
-    // $ ping localhost
-    // 64 bytes from localhost (::1): icmp_seq=2 ttl=64 time=0.095 ms
-    // 64 bytes from localhost (::1): icmp_seq=3 ttl=64 time=0.087 ms
-    //
-    // Thus the bandwidth with the maximum receive window would be:
-    //
-    // ((6291456*8) / (0,09/1000)) / 1000000 = 559_240 mBit/s
-    //
-    // An iperf run on localhost achieves around 60 gBit/sec:
-    //
-    // $ iperf -c 127.0.0.1
-    // [  3]  0.0-10.0 sec  68.4 GBytes  58.8 Gbits/sec
-    //
-    // A libp2p-perf run with the default yamux receive window settings (256
-    // kByte) achieves a bandwidth of 30 mBit/s:
-    //
-    // $ cargo run --bin client --release -- --server-address /ip4/127.0.0.1/tcp/9992
-    // Interval        Transfer        Bandwidth
-    // 0 s - 10.08 s   35 MBytes       27.78 MBit/s
-    //
-    // With the yamux receive window set to the OS max receive window (6291456
-    // bytes) libp2p-perf runs as fast as 500 mBit/s:
-    //
-    // $ cargo run --bin client --release -- --server-address /ip4/127.0.0.1/tcp/9992
-    // Interval        Transfer        Bandwidth
-    // 0 s - 10.00 s   614 MBytes      491.19 MBit/s
-    //
-    // Set to golang default of 16MiB
-    // (https://github.com/libp2p/go-libp2p-yamux/blob/35d571287404f972dc626e2de2980ef2c8178b26/transport.go#L15).
-    yamux_config.set_receive_window_size(16 * 1024 * 1024);
-    yamux_config.set_max_buffer_size(16 * 1024 * 1024);
+        // The default TCP receive window (minimum, default, maximum) on my OS
+        // (Debian) is:
+        //
+        // $ cat /proc/sys/net/ipv4/tcp_rmem
+        // 4096    131072  6291456
+        //
+        // Possible Bandwidth of a connection ignoring all overheads of TCP would be
+        // calculated with:
+        //
+        // Bandwidth (mBit/s) = (Receive window in bit) / (latency in s) / 1_000_000
+        //
+        // Ping latency via `localhost` is around 0.09 ms:
+        //
+        // $ ping localhost
+        // 64 bytes from localhost (::1): icmp_seq=2 ttl=64 time=0.095 ms
+        // 64 bytes from localhost (::1): icmp_seq=3 ttl=64 time=0.087 ms
+        //
+        // Thus the bandwidth with the maximum receive window would be:
+        //
+        // ((6291456*8) / (0,09/1000)) / 1000000 = 559_240 mBit/s
+        //
+        // An iperf run on localhost achieves around 60 gBit/sec:
+        //
+        // $ iperf -c 127.0.0.1
+        // [  3]  0.0-10.0 sec  68.4 GBytes  58.8 Gbits/sec
+        //
+        // A libp2p-perf run with the default yamux receive window settings (256
+        // kByte) achieves a bandwidth of 30 mBit/s:
+        //
+        // $ cargo run --bin client --release -- --server-address /ip4/127.0.0.1/tcp/9992
+        // Interval        Transfer        Bandwidth
+        // 0 s - 10.08 s   35 MBytes       27.78 MBit/s
+        //
+        // With the yamux receive window set to the OS max receive window (6291456
+        // bytes) libp2p-perf runs as fast as 500 mBit/s:
+        //
+        // $ cargo run --bin client --release -- --server-address /ip4/127.0.0.1/tcp/9992
+        // Interval        Transfer        Bandwidth
+        // 0 s - 10.00 s   614 MBytes      491.19 MBit/s
+        //
+        // Set to golang default of 16MiB
+        // (https://github.com/libp2p/go-libp2p-yamux/blob/35d571287404f972dc626e2de2980ef2c8178b26/transport.go#L15).
+        yamux_config.set_receive_window_size(16 * 1024 * 1024);
+        yamux_config.set_max_buffer_size(16 * 1024 * 1024);
 
-    let transport_security_config = match transport_security {
-        TransportSecurity::Plaintext => {
-            let plaintext = PlainText2Config {
-                local_public_key: keypair.public(),
-            };
+        let transport_security_config = match transport_security {
+            TransportSecurity::Plaintext => {
+                let plaintext = PlainText2Config {
+                    local_public_key: keypair.public(),
+                };
 
-            SelectUpgrade::new(OptionalUpgrade::<noise::NoiseAuthenticated<noise::XX,noise::X25519Spec,()>>::none(), OptionalUpgrade::some(plaintext))
-        }
-        TransportSecurity::Noise => {
-            let noise = noise::NoiseConfig::xx(
-                noise::Keypair::<noise::X25519Spec>::new()
-                    .into_authentic(&keypair)
-                    .unwrap(),
+                SelectUpgrade::new(OptionalUpgrade::<noise::NoiseAuthenticated<noise::XX,noise::X25519Spec,()>>::none(), OptionalUpgrade::some(plaintext))
+            }
+            TransportSecurity::Noise => {
+                let noise = noise::NoiseConfig::xx(
+                    noise::Keypair::<noise::X25519Spec>::new()
+                        .into_authentic(&keypair)
+                        .unwrap(),
+                )
+                .into_authenticated();
+
+                SelectUpgrade::new(
+                    OptionalUpgrade::some(noise),
+                    OptionalUpgrade::<PlainText2Config>::none(),
+                )
+            }
+            TransportSecurity::All => {
+                let noise = noise::NoiseConfig::xx(
+                    noise::Keypair::<noise::X25519Spec>::new()
+                        .into_authentic(&keypair)
+                        .unwrap(),
+                )
+                .into_authenticated();
+
+                let plaintext = PlainText2Config {
+                    local_public_key: keypair.public(),
+                };
+
+                SelectUpgrade::new(
+                    OptionalUpgrade::some(noise),
+                    OptionalUpgrade::some(plaintext),
+                )
+            }
+        };
+
+        let transport = block_on(dns::DnsConfig::system(tcp::TcpConfig::new().nodelay(true)))?;
+
+        transport
+            .upgrade(core::upgrade::Version::V1Lazy)
+            .authenticate(
+                transport_security_config
+                    .map_inbound(move |result| match result {
+                        EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
+                        EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
+                    })
+                    .map_outbound(move |result| match result {
+                        EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
+                        EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
+                    }),
             )
-            .into_authenticated();
-
-            SelectUpgrade::new(
-                OptionalUpgrade::some(noise),
-                OptionalUpgrade::<PlainText2Config>::none(),
-            )
-        }
-        TransportSecurity::All => {
-            let noise = noise::NoiseConfig::xx(
-                noise::Keypair::<noise::X25519Spec>::new()
-                    .into_authentic(&keypair)
-                    .unwrap(),
-            )
-            .into_authenticated();
-
-            let plaintext = PlainText2Config {
-                local_public_key: keypair.public(),
-            };
-
-            SelectUpgrade::new(
-                OptionalUpgrade::some(noise),
-                OptionalUpgrade::some(plaintext),
-            )
-        }
+            .multiplex(yamux_config)
+            .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
     };
 
-    let transport = if in_memory {
-        EitherTransport::Left(MemoryTransport {})
-    } else {
-        EitherTransport::Right(block_on(dns::DnsConfig::system(
-            tcp::TcpConfig::new().nodelay(true),
-        ))?)
+    let quic_transport = {
+        block_on(QuicTransport::new(
+            QuicConfig::<TlsCrypto>::new(keypair),
+            "/ip4/0.0.0.0/udp/0/quic".parse().unwrap(),
+        ))
+        .unwrap()
     };
 
-    Ok(transport
-        .upgrade(core::upgrade::Version::V1)
-        .authenticate(
-            transport_security_config
-                .map_inbound(move |result| match result {
-                    EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
-                    EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
-                })
-                .map_outbound(move |result| match result {
-                    EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
-                    EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
-                }),
-        )
-        .multiplex(yamux_config)
-        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
+    Ok(OrTransport::new(quic_transport, tcp_transport)
+        .map(|(either_output), _| match either_output {
+            EitherOutput::First((peer_id, muxer)) => (peer_id, StreamMuxerBox::new(muxer)),
+            EitherOutput::Second((peer_id, muxer)) => (peer_id, StreamMuxerBox::new(muxer)),
+        })
         .boxed())
 }
 
