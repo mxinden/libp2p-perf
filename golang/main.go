@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"io"
@@ -10,12 +11,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
-	yamux "github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -29,14 +30,14 @@ func main() {
 	listenAddr := flag.String("listen-address", "", "")
 	fakeCryptoSeed := flag.Bool("fake-crypto-seed", false, "")
 	transportSecurity := flag.String(
-		"transport-security",
+		"tcp-transport-security",
 		"noise",
 		"Mechanism to secure transport, either 'noise' or 'plaintext'.",
 	)
 	flag.Parse()
 
 	if *listenAddr == "" {
-		*listenAddr = "/ip4/127.0.0.1/tcp/0"
+		*listenAddr = "/ip4/127.0.0.1/udp/0/quic"
 	}
 
 	var priv crypto.PrivKey
@@ -51,16 +52,22 @@ func main() {
 			panic(err)
 		}
 	} else {
-		priv, _, err = crypto.GenerateKeyPair(crypto.RSA, 2048)
+		priv, _, err = crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
 			panic(err)
 		}
 	}
 
+	transport, err := libp2pquic.NewTransport(priv, nil, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
 	opts := []libp2p.Option{
 		libp2p.ListenAddrStrings(*listenAddr),
 		libp2p.Identity(priv),
-		libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
+		libp2p.Transport(transport),
+		//libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport),
 	}
 
 	if *transportSecurity == "noise" || *transportSecurity == "" {
@@ -69,6 +76,8 @@ func main() {
 		opts = append(opts, libp2p.NoSecurity)
 	}
 
+	ctx := context.Background()
+	ctx, cancelLibp2p := context.WithCancel(ctx)
 	basicHost, err := libp2p.New(opts...)
 	if err != nil {
 		panic(err)
@@ -78,8 +87,10 @@ func main() {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
 			s.Close()
+			s.CloseWrite()
 		} else {
 			s.Close()
+			s.CloseWrite()
 		}
 	})
 
@@ -90,6 +101,9 @@ func main() {
 		fullAddr := addr.Encapsulate(hostAddr)
 		log.Printf("Now run \"./go-libp2p-perf --server-address %s\" on a different terminal.\n", fullAddr)
 		select {} // hang forever
+	} else {
+		defer cancelLibp2p()
+		defer basicHost.Close()
 	}
 
 	// The following code extracts target's the peer ID from the
@@ -118,7 +132,7 @@ func main() {
 	// so LibP2P knows how to contact it
 	basicHost.Peerstore().AddAddr(peerid, targetAddr, peerstore.PermanentAddrTTL)
 
-	s, err := basicHost.NewStream(context.Background(), peerid, PROTOCOL_NAME)
+	s, err := basicHost.NewStream(ctx, peerid, PROTOCOL_NAME)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -133,6 +147,7 @@ func main() {
 		transfered += BUFFER_SIZE
 	}
 	s.Close()
+	s.CloseWrite()
 
 	printRun(start, transfered)
 }

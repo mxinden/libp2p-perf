@@ -68,9 +68,9 @@ impl NetworkBehaviour for Perf {
         &mut self,
         _peer_id: Option<PeerId>,
         _handler: PerfHandler,
-        _error: &DialError,
+        error: &DialError,
     ) {
-        panic!("inject dial failure");
+        panic!("inject dial failure: {:?}", error);
     }
 
     fn inject_new_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}

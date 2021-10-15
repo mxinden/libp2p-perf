@@ -1,9 +1,7 @@
-use futures::future::poll_fn;
 use futures::prelude::*;
-use libp2p::{identity, Multiaddr, PeerId, Swarm};
-use libp2p_perf::{build_transport, Perf, TransportSecurity};
+use libp2p::{identity, Multiaddr, PeerId, Swarm, swarm::SwarmEvent};
+use libp2p_perf::{build_transport, Perf, TcpTransportSecurity};
 use std::path::PathBuf;
-use std::task::Poll;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -13,15 +11,23 @@ use structopt::StructOpt;
 )]
 struct Opt {
     #[structopt(long)]
-    listen_address: Multiaddr,
+    listen_address: Vec<Multiaddr>,
 
     #[structopt(long)]
     private_key_pkcs8: Option<PathBuf>,
 }
 
+fn setup_global_subscriber() {
+    let filter_layer = tracing_subscriber::EnvFilter::from_default_env();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter_layer)
+        .try_init()
+        .ok();
+}
+
 #[async_std::main]
 async fn main() {
-    env_logger::init();
+    setup_global_subscriber();
     let opt = Opt::from_args();
 
     let key = if let Some(path) = opt.private_key_pkcs8 {
@@ -32,28 +38,29 @@ async fn main() {
     };
     let local_peer_id = PeerId::from(key.public());
 
-    let transport = build_transport(false, key, TransportSecurity::All).unwrap();
+    println!("Local peer id: {:?}", local_peer_id);
+
+    let transport = build_transport(key, TcpTransportSecurity::All).unwrap();
     let perf = Perf::default();
     let mut server = Swarm::with_async_std_executor(transport, perf, local_peer_id);
 
-    server.listen_on(opt.listen_address).unwrap();
-    let mut listening = false;
+    assert!(
+        !opt.listen_address.is_empty(),
+        "Provide at least one listen address."
+    );
+    for addr in opt.listen_address {
+        println!("about to listen on {:?}", addr);
+        server.listen_on(addr).unwrap();
+    }
 
-    poll_fn(|cx| loop {
-        match server.poll_next_unpin(cx) {
-            Poll::Ready(Some(e)) => println!("{:?}", e),
-            Poll::Ready(None) => panic!("Unexpected server termination."),
-            Poll::Pending => {
-                if !listening {
-                    if let Some(a) = Swarm::listeners(&server).next() {
-                        println!("Listening on {:?}.", a);
-                        listening = true;
-                    }
-                }
-
-                return Poll::Pending;
+    loop {
+        match server.next().await.unwrap() {
+            SwarmEvent::NewListenAddr { address, .. } => {
+                println!("Listening on {:?}.", address);
+            }
+            e => {
+                println!("{:?}", e);
             }
         }
-    })
-    .await
+    }
 }
