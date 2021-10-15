@@ -5,7 +5,7 @@ use libp2p::{
         ConnectedPoint,
     },
     swarm::{
-        IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
+        DialError, IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
         PollParameters, ProtocolsHandler,
     },
     Multiaddr, PeerId,
@@ -18,7 +18,12 @@ use std::time::Duration;
 #[derive(Default)]
 pub struct Perf {
     connected_peers: Vec<(PeerId, Direction)>,
-    outbox: Vec<NetworkBehaviourAction<<<<Self as NetworkBehaviour>::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, <Self as NetworkBehaviour>::OutEvent>>
+    outbox: Vec<
+        NetworkBehaviourAction<
+            <Self as NetworkBehaviour>::OutEvent,
+            <Self as NetworkBehaviour>::ProtocolsHandler,
+        >,
+    >,
 }
 
 enum Direction {
@@ -58,6 +63,7 @@ impl NetworkBehaviour for Perf {
         peer_id: &PeerId,
         _: &ConnectionId,
         connected_point: &ConnectedPoint,
+        _failed_addresses: Option<&Vec<Multiaddr>>,
     ) {
         let direction = match connected_point {
             ConnectedPoint::Dialer { .. } => Direction::Outgoing,
@@ -67,7 +73,14 @@ impl NetworkBehaviour for Perf {
         self.connected_peers.push((peer_id.clone(), direction));
     }
 
-    fn inject_connection_closed(&mut self, _: &PeerId, _: &ConnectionId, _: &ConnectedPoint) {}
+    fn inject_connection_closed(
+        &mut self,
+        _: &PeerId,
+        _: &ConnectionId,
+        _: &ConnectedPoint,
+        _handler: PerfHandler,
+    ) {
+    }
 
     fn inject_event(
         &mut self,
@@ -82,16 +95,12 @@ impl NetworkBehaviour for Perf {
         }
     }
 
-    fn inject_addr_reach_failure(
+    fn inject_dial_failure(
         &mut self,
-        _peer_id: Option<&PeerId>,
-        _addr: &Multiaddr,
-        error: &dyn error::Error,
+        _peer_id: Option<PeerId>,
+        _handler: PerfHandler,
+        _error: &DialError,
     ) {
-        panic!("inject addr reach failure: {:?}", error);
-    }
-
-    fn inject_dial_failure(&mut self, _peer_id: &PeerId) {
         panic!("inject dial failure");
     }
 
@@ -109,8 +118,11 @@ impl NetworkBehaviour for Perf {
         panic!("listener closed {:?}", reason);
     }
 
-    fn poll(&mut self, _cx: &mut Context, _params: &mut impl PollParameters)
-    -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
+    fn poll(
+        &mut self,
+        _cx: &mut Context,
+        _params: &mut impl PollParameters,
+    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
         if let Some(action) = self.outbox.pop() {
             return Poll::Ready(action);
         }
