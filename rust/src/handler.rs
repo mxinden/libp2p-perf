@@ -211,6 +211,7 @@ pub enum PerfHandlerIn {
     StartPerf,
 }
 
+#[derive(Debug)]
 pub enum PerfHandlerOut {
     PerfRunDone(Duration, usize),
 }
