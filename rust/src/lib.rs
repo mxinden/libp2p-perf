@@ -8,25 +8,25 @@ use futures::executor::block_on;
 use libp2p::{
     core::{
         self,
-        either::{EitherOutput, EitherTransport},
+        either::EitherOutput,
         muxing::StreamMuxerBox,
-        transport::{choice::OrTransport, MemoryTransport, Transport},
+        transport::{choice::OrTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
-    quic::{Crypto, QuicConfig, QuicTransport, TlsCrypto, ToLibp2p},
+    quic::{QuicConfig, QuicTransport, TlsCrypto},
     tcp, yamux, PeerId,
 };
 
 #[derive(Debug)]
-pub enum TransportSecurity {
+pub enum TcpTransportSecurity {
     Noise,
     Plaintext,
     All,
 }
 
-impl std::str::FromStr for TransportSecurity {
+impl std::str::FromStr for TcpTransportSecurity {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -39,16 +39,15 @@ impl std::str::FromStr for TransportSecurity {
     }
 }
 
-impl std::fmt::Display for TransportSecurity {
+impl std::fmt::Display for TcpTransportSecurity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
 pub fn build_transport(
-    in_memory: bool,
     keypair: identity::Keypair,
-    transport_security: TransportSecurity,
+    tcp_transport_security: TcpTransportSecurity,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
     let tcp_transport = {
         let mut yamux_config = yamux::YamuxConfig::default();
@@ -99,15 +98,15 @@ pub fn build_transport(
         yamux_config.set_receive_window_size(16 * 1024 * 1024);
         yamux_config.set_max_buffer_size(16 * 1024 * 1024);
 
-        let transport_security_config = match transport_security {
-            TransportSecurity::Plaintext => {
+        let tcp_transport_security_config = match tcp_transport_security {
+            TcpTransportSecurity::Plaintext => {
                 let plaintext = PlainText2Config {
                     local_public_key: keypair.public(),
                 };
 
                 SelectUpgrade::new(OptionalUpgrade::<noise::NoiseAuthenticated<noise::XX,noise::X25519Spec,()>>::none(), OptionalUpgrade::some(plaintext))
             }
-            TransportSecurity::Noise => {
+            TcpTransportSecurity::Noise => {
                 let noise = noise::NoiseConfig::xx(
                     noise::Keypair::<noise::X25519Spec>::new()
                         .into_authentic(&keypair)
@@ -120,7 +119,7 @@ pub fn build_transport(
                     OptionalUpgrade::<PlainText2Config>::none(),
                 )
             }
-            TransportSecurity::All => {
+            TcpTransportSecurity::All => {
                 let noise = noise::NoiseConfig::xx(
                     noise::Keypair::<noise::X25519Spec>::new()
                         .into_authentic(&keypair)
@@ -144,7 +143,7 @@ pub fn build_transport(
         transport
             .upgrade(core::upgrade::Version::V1Lazy)
             .authenticate(
-                transport_security_config
+                tcp_transport_security_config
                     .map_inbound(move |result| match result {
                         EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
                         EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
@@ -167,7 +166,7 @@ pub fn build_transport(
     };
 
     Ok(OrTransport::new(quic_transport, tcp_transport)
-        .map(|(either_output), _| match either_output {
+        .map(|either_output, _| match either_output {
             EitherOutput::First((peer_id, muxer)) => (peer_id, StreamMuxerBox::new(muxer)),
             EitherOutput::Second((peer_id, muxer)) => (peer_id, StreamMuxerBox::new(muxer)),
         })
@@ -197,7 +196,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(true, key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -206,7 +205,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(true, key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };

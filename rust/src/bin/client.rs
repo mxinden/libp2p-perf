@@ -1,7 +1,7 @@
 use futures::prelude::*;
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, Multiaddr, PeerId};
-use libp2p_perf::{build_transport, Perf, TransportSecurity};
+use libp2p_perf::{build_transport, Perf, TcpTransportSecurity};
 use log::warn;
 use structopt::StructOpt;
 
@@ -15,7 +15,7 @@ struct Opt {
     server_address: Multiaddr,
 
     #[structopt(long)]
-    transport_security: Option<TransportSecurity>,
+    tcp_transport_security: Option<TcpTransportSecurity>,
 }
 
 #[async_std::main]
@@ -29,9 +29,9 @@ async fn main() {
     println!("Local peer id: {:?}", local_peer_id);
 
     let transport = build_transport(
-        false,
         key,
-        opt.transport_security.unwrap_or(TransportSecurity::Noise),
+        opt.tcp_transport_security
+            .unwrap_or(TcpTransportSecurity::Noise),
     )
     .unwrap();
     let perf = Perf::default();
