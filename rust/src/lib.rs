@@ -12,6 +12,7 @@ use libp2p::{
         muxing::StreamMuxerBox,
         transport::{choice::OrTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
+        Multiaddr,
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
@@ -48,6 +49,7 @@ impl std::fmt::Display for TcpTransportSecurity {
 pub fn build_transport(
     keypair: identity::Keypair,
     tcp_transport_security: TcpTransportSecurity,
+    quic_addr: Option<Multiaddr>,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
     let tcp_transport = {
         let mut yamux_config = yamux::YamuxConfig::default();
@@ -160,7 +162,7 @@ pub fn build_transport(
     let quic_transport = {
         block_on(QuicTransport::new(
             QuicConfig::<TlsCrypto>::new(keypair),
-            "/ip4/0.0.0.0/udp/0/quic".parse().unwrap(),
+            quic_addr.unwrap_or("/ip4/0.0.0.0/udp/0/quic".parse().unwrap()),
         ))
         .unwrap()
     };

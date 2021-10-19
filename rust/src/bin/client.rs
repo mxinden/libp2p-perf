@@ -31,6 +31,7 @@ async fn main() {
         key,
         opt.tcp_transport_security
             .unwrap_or(TcpTransportSecurity::Noise),
+        None,
     )
     .unwrap();
     let perf = Perf::default();
