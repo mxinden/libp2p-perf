@@ -2,7 +2,6 @@ use futures::prelude::*;
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, Multiaddr, PeerId};
 use libp2p_perf::{build_transport, Perf, TcpTransportSecurity};
-use log::warn;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -41,10 +40,7 @@ async fn main() {
         }))
         .build();
 
-    // Hack as Swarm::dial_addr does not accept Multiaddr with PeerId.
-    let mut server_address = opt.server_address;
-
-    client.dial_addr(server_address).unwrap();
+    client.dial_addr(opt.server_address).unwrap();
 
     loop {
         match client.next().await.expect("Infinite stream.") {

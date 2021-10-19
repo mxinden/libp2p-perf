@@ -181,9 +181,8 @@ mod tests {
     use futures::prelude::*;
     use futures::stream::StreamExt;
     use futures::task::Spawn;
-    use libp2p::core::multiaddr::{Multiaddr, Protocol};
+    use libp2p::core::multiaddr::Multiaddr;
     use libp2p::swarm::{Swarm, SwarmEvent};
-    use rand::random;
 
     use std::time::Duration;
 
@@ -196,7 +195,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(true, key, TcpTransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -205,17 +204,21 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(true, key, TcpTransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
-        let receiver_address: Multiaddr = Protocol::Memory(random::<u64>()).into();
+        let receiver_address: Multiaddr = "/ip6/::1/tcp/0".parse().unwrap();
 
         // Wait for receiver to bind to listen address.
-        pool.run_until(async {
+        let receiver_listen_addr = pool.run_until(async {
             let id = receiver.listen_on(receiver_address.clone()).unwrap();
             match receiver.next().await.unwrap() {
-                SwarmEvent::NewListenAddr { listener_id, .. } if listener_id == id => {}
+                SwarmEvent::NewListenAddr {
+                    listener_id,
+                    address,
+                    ..
+                } if listener_id == id => address,
                 _ => panic!("Unexpected event."),
             }
         });
@@ -232,7 +235,7 @@ mod tests {
             )
             .unwrap();
 
-        sender.dial_addr(receiver_address).unwrap();
+        sender.dial_addr(receiver_listen_addr).unwrap();
 
         pool.run_until(async move {
             loop {
