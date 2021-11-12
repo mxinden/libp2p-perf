@@ -62,6 +62,7 @@ impl NetworkBehaviour for Perf {
         peer_id: &PeerId,
         _: &ConnectionId,
         connected_point: &ConnectedPoint,
+        _: Option<&Vec<Multiaddr>>,
     ) {
         let direction = match connected_point {
             ConnectedPoint::Dialer { .. } => Direction::Outgoing,
@@ -93,7 +94,7 @@ impl NetworkBehaviour for Perf {
         }
     }
 
-    fn inject_dial_failure(&mut self, _peer_id: &PeerId, _handler: PerfHandler, error: DialError) {
+    fn inject_dial_failure(&mut self, _peer_id: Option<PeerId>, _handler: PerfHandler, error: &DialError) {
         panic!("inject dial failure: {:?}", error);
     }
 
