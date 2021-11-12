@@ -7,8 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libp2p = { git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic", version = "0.40.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
-libp2p-quic = {  git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic", version = "0.6.0", default-features = false, features = ["tls"] }
+libp2p = { git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic", version = "0.41.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
 futures_codec = "0.4"
 futures = "0.3.1"
 async-std = { version = "1.6.2", features = ["attributes"] }

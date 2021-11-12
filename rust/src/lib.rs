@@ -15,7 +15,7 @@ use libp2p::{
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
-    quic::{QuicConfig, QuicTransport, TlsCrypto},
+    quic::{QuicConfig, QuicTransport},
     tcp, yamux, PeerId,
 };
 
@@ -159,7 +159,7 @@ pub fn build_transport(
 
     let quic_transport = {
         block_on(QuicTransport::new(
-            QuicConfig::<TlsCrypto>::new(keypair),
+            QuicConfig::new(keypair),
             "/ip4/0.0.0.0/udp/0/quic".parse().unwrap(),
         ))
         .unwrap()
