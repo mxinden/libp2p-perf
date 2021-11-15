@@ -10,7 +10,6 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use std::error;
 use std::fmt;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -63,7 +62,7 @@ impl NetworkBehaviour for Perf {
         peer_id: &PeerId,
         _: &ConnectionId,
         connected_point: &ConnectedPoint,
-        _failed_addresses: Option<&Vec<Multiaddr>>,
+        _: Option<&Vec<Multiaddr>>,
     ) {
         let direction = match connected_point {
             ConnectedPoint::Dialer { .. } => Direction::Outgoing,
@@ -99,9 +98,9 @@ impl NetworkBehaviour for Perf {
         &mut self,
         _peer_id: Option<PeerId>,
         _handler: PerfHandler,
-        _error: &DialError,
+        error: &DialError,
     ) {
-        panic!("inject dial failure");
+        panic!("inject dial failure: {:?}", error);
     }
 
     fn inject_new_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}
