@@ -197,7 +197,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext, None).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -206,7 +206,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext, None).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
