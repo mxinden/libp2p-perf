@@ -222,7 +222,7 @@ mod tests {
             )
             .unwrap();
 
-        sender.dial_addr(receiver_address).unwrap();
+        sender.dial(receiver_address).unwrap();
 
         pool.run_until(async move {
             loop {
