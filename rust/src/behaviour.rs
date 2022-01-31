@@ -10,7 +10,6 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use std::error;
 use std::fmt;
 use std::task::{Context, Poll};
 use std::time::Duration;
