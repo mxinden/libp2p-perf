@@ -9,17 +9,19 @@ edition = "2018"
 [dependencies]
 #libp2p = { version = "0.42.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
 #libp2p = { git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic", version = "0.42.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
-#libp2p = { git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic-reimplementation", version = "0.42.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
-libp2p = { path = "/home/kpp/parity/rust-libp2p" }
+libp2p = { git = "https://github.com/kpp/rust-libp2p", branch = "libp2p-quic-reimplementation", version = "0.42.0", default-features = false, features = ["dns-async-std", "noise", "plaintext", "tcp-async-io", "yamux", "quic"] }
+#libp2p = { path = "/home/kpp/parity/rust-libp2p" }
 futures_codec = "0.4"
 futures = "0.3.1"
 async-std = { version = "1.6.2", features = ["attributes"] }
 bytes = "1.0.1"
 structopt = "0.3"
 env_logger = "0.9.0"
+tracing = "0.1.30"
 tracing-subscriber = {version = "0.3.8", features = ["env-filter"] }
 tracing-flame = "0.2"
 log = "0.4"
+log-panics = "2"
 
 [dev-dependencies]
 rand = "0.8.0"
