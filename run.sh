@@ -12,7 +12,7 @@ trap "kill 0" EXIT
 TcpTransportSecurityProtocols=( noise plaintext )
 
 echo "# Start Rust and Golang servers."
-./rust/target/release/server --private-key-pkcs8 rust/test.pk8 --listen-address /ip4/127.0.0.1/udp/9992/quic > /dev/null 2>&1 &
+RUST_BACKTRACE=full RUST_LOG=off ./rust/target/release/server --private-key-pkcs8 rust/test.pk8 --listen-address /ip4/127.0.0.1/udp/9992/quic  2>&1 &
 ./golang/go-libp2p-perf --fake-crypto-seed --listen-address /ip4/0.0.0.0/udp/9993/quic --tcp-transport-security noise > /dev/null 2>&1 &
 ./golang/go-libp2p-perf --fake-crypto-seed --listen-address /ip4/0.0.0.0/udp/9994/quic --tcp-transport-security plaintext > /dev/null 2>&1 &
 
@@ -24,7 +24,7 @@ for Protocol in ${TcpTransportSecurityProtocols[*]}
 do
     echo
     echo "## Transport security $Protocol"
-    ./rust/target/release/client --server-address /ip4/127.0.0.1/udp/9992/quic --tcp-transport-security $Protocol
+    RUST_BACKTRACE=full RUST_LOG=off ./rust/target/release/client --server-address /ip4/127.0.0.1/udp/9992/quic --tcp-transport-security $Protocol
     break # FIXME
 done
 
