@@ -44,6 +44,7 @@ fn setup_global_subscriber() -> impl Drop {
 async fn main() {
     // env_logger::init();
     let _guard = setup_global_subscriber();
+    log_panics::init();
     let opt = Opt::from_args();
 
     let key = identity::Keypair::generate_ed25519();
