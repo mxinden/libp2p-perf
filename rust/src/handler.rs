@@ -3,8 +3,8 @@ use futures::stream::FuturesUnordered;
 use libp2p::{
     core::upgrade::{InboundUpgrade, OutboundUpgrade},
     swarm::{
-        KeepAlive, NegotiatedSubstream, ProtocolsHandler, ProtocolsHandlerEvent,
-        ProtocolsHandlerUpgrErr, SubstreamProtocol,
+        ConnectionHandler, ConnectionHandlerEvent, ConnectionHandlerUpgrErr, KeepAlive,
+        NegotiatedSubstream, SubstreamProtocol,
     },
 };
 use std::io;
@@ -25,20 +25,20 @@ const MSG: &[u8] = &[0u8; BUFFER_SIZE];
 #[derive(Default)]
 pub struct PerfHandler {
     outbox: Vec<
-        ProtocolsHandlerEvent<
-            <Self as ProtocolsHandler>::OutboundProtocol,
-            <Self as ProtocolsHandler>::OutboundOpenInfo,
-            <Self as ProtocolsHandler>::OutEvent,
-            <Self as ProtocolsHandler>::Error,
+        ConnectionHandlerEvent<
+            <Self as ConnectionHandler>::OutboundProtocol,
+            <Self as ConnectionHandler>::OutboundOpenInfo,
+            <Self as ConnectionHandler>::OutEvent,
+            <Self as ConnectionHandler>::Error,
         >,
     >,
     perf_runs:
         FuturesUnordered<
             PerfRun<
-                <<Self as ProtocolsHandler>::InboundProtocol as InboundUpgrade<
+                <<Self as ConnectionHandler>::InboundProtocol as InboundUpgrade<
                     NegotiatedSubstream,
                 >>::Output,
-                <<Self as ProtocolsHandler>::OutboundProtocol as OutboundUpgrade<
+                <<Self as ConnectionHandler>::OutboundProtocol as OutboundUpgrade<
                     NegotiatedSubstream,
                 >>::Output,
             >,
@@ -216,11 +216,11 @@ pub enum PerfHandlerOut {
     PerfRunDone(Duration, usize),
 }
 
-impl ProtocolsHandler for PerfHandler {
+impl ConnectionHandler for PerfHandler {
     type InEvent = PerfHandlerIn;
     /// Custom event that can be produced by the handler and that will be returned to the outside.
     type OutEvent = PerfHandlerOut;
-    /// The type of errors returned by [`ProtocolsHandler::poll`].
+    /// The type of errors returned by [`ConnectionHandler::poll`].
     type Error = io::Error;
     /// The inbound upgrade for the protocol(s) used by the handler.
     type InboundProtocol = PerfProtocolConfig;
@@ -257,7 +257,7 @@ impl ProtocolsHandler for PerfHandler {
     /// Injects the output of a successful upgrade on a new outbound substream.
     ///
     /// The second argument is the information that was previously passed to
-    /// [`ProtocolsHandlerEvent::OutboundSubstreamRequest`].
+    /// [`ConnectionHandlerEvent::OutboundSubstreamRequest`].
     fn inject_fully_negotiated_outbound(
         &mut self,
         substream: <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Output,
@@ -272,7 +272,7 @@ impl ProtocolsHandler for PerfHandler {
         match event {
             PerfHandlerIn::StartPerf => {
                 self.outbox
-                    .push(ProtocolsHandlerEvent::OutboundSubstreamRequest {
+                    .push(ConnectionHandlerEvent::OutboundSubstreamRequest {
                         protocol: SubstreamProtocol::new(PerfProtocolConfig {}, ()),
                     })
             }
@@ -283,7 +283,7 @@ impl ProtocolsHandler for PerfHandler {
     fn inject_dial_upgrade_error(
         &mut self,
         _info: Self::OutboundOpenInfo,
-        error: ProtocolsHandlerUpgrErr<
+        error: ConnectionHandlerUpgrErr<
             <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Error,
         >,
     ) {
@@ -293,8 +293,8 @@ impl ProtocolsHandler for PerfHandler {
     /// Returns until when the connection should be kept alive.
     ///
     /// This method is called by the `Swarm` after each invocation of
-    /// [`ProtocolsHandler::poll`] to determine if the connection and the associated
-    /// `ProtocolsHandler`s should be kept alive as far as this handler is concerned
+    /// [`ConnectionHandler::poll`] to determine if the connection and the associated
+    /// `ConnectionHandler`s should be kept alive as far as this handler is concerned
     /// and if so, for how long.
     ///
     /// Returning [`KeepAlive::No`] indicates that the connection should be
@@ -307,7 +307,7 @@ impl ProtocolsHandler for PerfHandler {
     /// be kept alive until the next call to this method.
     ///
     /// > **Note**: The connection is always closed and the handler destroyed
-    /// > when [`ProtocolsHandler::poll`] returns an error. Furthermore, the
+    /// > when [`ConnectionHandler::poll`] returns an error. Furthermore, the
     /// > connection may be closed for reasons outside of the control
     /// > of the handler.
     fn connection_keep_alive(&self) -> KeepAlive {
@@ -318,7 +318,7 @@ impl ProtocolsHandler for PerfHandler {
         &mut self,
         cx: &mut Context,
     ) -> Poll<
-        ProtocolsHandlerEvent<
+        ConnectionHandlerEvent<
             Self::OutboundProtocol,
             Self::OutboundOpenInfo,
             Self::OutEvent,
@@ -331,7 +331,7 @@ impl ProtocolsHandler for PerfHandler {
 
         match self.perf_runs.poll_next_unpin(cx) {
             Poll::Ready(Some((duration, transfered))) => {
-                return Poll::Ready(ProtocolsHandlerEvent::Custom(PerfHandlerOut::PerfRunDone(
+                return Poll::Ready(ConnectionHandlerEvent::Custom(PerfHandlerOut::PerfRunDone(
                     duration, transfered,
                 )));
             }
