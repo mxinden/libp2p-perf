@@ -16,7 +16,6 @@ use std::time::Duration;
 
 #[derive(Default)]
 pub struct Perf {
-    connected_peers: Vec<(PeerId, Direction)>,
     outbox: Vec<
         NetworkBehaviourAction<
             <Self as NetworkBehaviour>::OutEvent,
@@ -43,33 +42,26 @@ impl NetworkBehaviour for Perf {
         vec![]
     }
 
-    fn inject_connected(&mut self, peer_id: &PeerId) {
-        for (peer, direction) in &self.connected_peers {
-            if peer == peer_id && matches!(direction, Direction::Outgoing) {
-                self.outbox.push(NetworkBehaviourAction::NotifyHandler {
-                    peer_id: peer_id.clone(),
-                    event: PerfHandlerIn::StartPerf,
-                    handler: NotifyHandler::Any,
-                })
-            }
-        }
-    }
-
-    fn inject_disconnected(&mut self, _peer_id: &PeerId) {}
-
     fn inject_connection_established(
         &mut self,
         peer_id: &PeerId,
         _: &ConnectionId,
         connected_point: &ConnectedPoint,
         _: Option<&Vec<Multiaddr>>,
+        _: usize,
     ) {
         let direction = match connected_point {
             ConnectedPoint::Dialer { .. } => Direction::Outgoing,
             ConnectedPoint::Listener { .. } => Direction::Incoming,
         };
 
-        self.connected_peers.push((peer_id.clone(), direction));
+        if matches!(direction, Direction::Outgoing) {
+            self.outbox.push(NetworkBehaviourAction::NotifyHandler {
+                peer_id: peer_id.clone(),
+                event: PerfHandlerIn::StartPerf,
+                handler: NotifyHandler::Any,
+            })
+        }
     }
 
     fn inject_connection_closed(
@@ -78,6 +70,7 @@ impl NetworkBehaviour for Perf {
         _: &ConnectionId,
         _: &ConnectedPoint,
         _handler: PerfHandler,
+        _: usize,
     ) {
     }
 

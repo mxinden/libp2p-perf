@@ -17,34 +17,17 @@ struct Opt {
     tcp_transport_security: Option<TcpTransportSecurity>,
 }
 
-fn setup_global_subscriber() -> impl Drop {
-    use tracing_flame::FlameLayer;
-    use tracing_subscriber::{prelude::*, fmt};
-
+fn setup_global_subscriber() {
     let filter_layer = tracing_subscriber::EnvFilter::from_default_env();
-
-    let fmt_format = tracing_subscriber::fmt::format()
-        .pretty()
-        .with_thread_ids(false)
-        .without_time();
-    let fmt_layer = fmt::Layer::default().event_format(fmt_format);
-
-    let (flame_layer, _guard) = FlameLayer::with_file("./tracing.client.folded").unwrap();
-
-    tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(fmt_layer)
-        .with(flame_layer)
+    tracing_subscriber::fmt()
+        .with_env_filter(filter_layer)
         .try_init()
         .ok();
-    _guard
 }
 
 #[async_std::main]
 async fn main() {
-    // env_logger::init();
-    let _guard = setup_global_subscriber();
-    log_panics::init();
+    setup_global_subscriber();
     let opt = Opt::from_args();
 
     let key = identity::Keypair::generate_ed25519();
@@ -68,21 +51,24 @@ async fn main() {
 
     client.dial(opt.server_address).unwrap();
 
+    let mut remote_peer_id = None;
+
     loop {
         match client.next().await.expect("Infinite stream.") {
             SwarmEvent::Behaviour(e) => {
                 println!("{}", e);
 
-                // TODO: Fix hack
-                //
-                // Performance run timer has already been stopped. Wait for a second
-                // to make sure the receiving side of the substream on the server is
-                // closed before the whole connection is dropped.
-                std::thread::sleep(std::time::Duration::from_secs(1));
-
+                if let Some(peer_id) = remote_peer_id.take() {
+                    client.disconnect_peer_id(peer_id).unwrap();
+                }
+            }
+            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                remote_peer_id = Some(peer_id);
+            }
+            e @ SwarmEvent::ConnectionClosed { .. } => {
+                println!("{:?}", e);
                 break;
             }
-            SwarmEvent::ConnectionEstablished { .. } => {}
             e => panic!("{:?}", e),
         }
     }

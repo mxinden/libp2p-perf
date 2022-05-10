@@ -18,34 +18,17 @@ struct Opt {
     private_key_pkcs8: Option<PathBuf>,
 }
 
-fn setup_global_subscriber() -> impl Drop {
-    use tracing_flame::FlameLayer;
-    use tracing_subscriber::{prelude::*, fmt};
-
+fn setup_global_subscriber() {
     let filter_layer = tracing_subscriber::EnvFilter::from_default_env();
-
-    let fmt_format = tracing_subscriber::fmt::format()
-        .pretty()
-        .with_thread_ids(false)
-        .without_time();
-    let fmt_layer = fmt::Layer::default().event_format(fmt_format);
-
-    let (flame_layer, _guard) = FlameLayer::with_file("./tracing.server.folded").unwrap();
-
-    tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(fmt_layer)
-        .with(flame_layer)
+    tracing_subscriber::fmt()
+        .with_env_filter(filter_layer)
         .try_init()
         .ok();
-    _guard
 }
 
 #[async_std::main]
 async fn main() {
-    // env_logger::init();
-    let _guard = setup_global_subscriber();
-    log_panics::init();
+    setup_global_subscriber();
     let opt = Opt::from_args();
 
     let key = if let Some(path) = opt.private_key_pkcs8 {
