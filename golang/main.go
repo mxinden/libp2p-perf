@@ -76,7 +76,9 @@ func main() {
 		opts = append(opts, libp2p.NoSecurity)
 	}
 
-	basicHost, err := libp2p.New(context.Background(), opts...)
+	ctx := context.Background()
+	ctx, cancelLibp2p := context.WithCancel(ctx)
+	basicHost, err := libp2p.New(ctx, opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -85,8 +87,10 @@ func main() {
 		if err := handleIncomingPerfRun(s); err != nil {
 			log.Println(err)
 			s.Close()
+			s.CloseWrite()
 		} else {
 			s.Close()
+			s.CloseWrite()
 		}
 	})
 
@@ -97,6 +101,9 @@ func main() {
 		fullAddr := addr.Encapsulate(hostAddr)
 		log.Printf("Now run \"./go-libp2p-perf --server-address %s\" on a different terminal.\n", fullAddr)
 		select {} // hang forever
+	} else {
+		defer cancelLibp2p()
+		defer basicHost.Close()
 	}
 
 	// The following code extracts target's the peer ID from the
@@ -125,7 +132,7 @@ func main() {
 	// so LibP2P knows how to contact it
 	basicHost.Peerstore().AddAddr(peerid, targetAddr, peerstore.PermanentAddrTTL)
 
-	s, err := basicHost.NewStream(context.Background(), peerid, PROTOCOL_NAME)
+	s, err := basicHost.NewStream(ctx, peerid, PROTOCOL_NAME)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -140,6 +147,7 @@ func main() {
 		transfered += BUFFER_SIZE
 	}
 	s.Close()
+	s.CloseWrite()
 
 	printRun(start, transfered)
 }
