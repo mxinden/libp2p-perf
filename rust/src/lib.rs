@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn it_works() {
         let mut pool = LocalPool::new();
-        let _ = env_logger::try_init();
+        let _  = tracing_subscriber::fmt().try_init();
 
         let mut sender = {
             let key = identity::Keypair::generate_ed25519();
@@ -206,11 +206,12 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TcpTransportSecurity::Plaintext, None).unwrap();
+            let quic_addr = Some("/ip4/0.0.0.0/udp/9992/quic".parse().unwrap());
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext, quic_addr).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
-        let receiver_address: Multiaddr = "/ip6/::1/tcp/0".parse().unwrap();
+        let receiver_address: Multiaddr = "/ip4/127.0.0.1/udp/9992/quic".parse().unwrap();
 
         // Wait for receiver to bind to listen address.
         let receiver_listen_addr = pool.run_until(async {
