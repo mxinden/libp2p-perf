@@ -5,8 +5,8 @@ use libp2p::{
         ConnectedPoint,
     },
     swarm::{
-        DialError, IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
-        PollParameters, ProtocolsHandler,
+        DialError, IntoConnectionHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
+        PollParameters, ConnectionHandler,
     },
     Multiaddr, PeerId,
 };
@@ -19,7 +19,7 @@ pub struct Perf {
     outbox: Vec<
         NetworkBehaviourAction<
             <Self as NetworkBehaviour>::OutEvent,
-            <Self as NetworkBehaviour>::ProtocolsHandler,
+            <Self as NetworkBehaviour>::ConnectionHandler,
         >,
     >,
 }
@@ -30,11 +30,11 @@ enum Direction {
 }
 
 impl NetworkBehaviour for Perf {
-    type ProtocolsHandler = PerfHandler;
+    type ConnectionHandler = PerfHandler;
 
     type OutEvent = PerfEvent;
 
-    fn new_handler(&mut self) -> Self::ProtocolsHandler {
+    fn new_handler(&mut self) -> Self::ConnectionHandler {
         PerfHandler::default()
     }
 
@@ -78,7 +78,7 @@ impl NetworkBehaviour for Perf {
         &mut self,
         _peer_id: PeerId,
         _connection: ConnectionId,
-        event: <<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::OutEvent,
+        event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
     ) {
         match event {
             PerfHandlerOut::PerfRunDone(duration, transfered) => self.outbox.push(
@@ -114,7 +114,7 @@ impl NetworkBehaviour for Perf {
         &mut self,
         _cx: &mut Context,
         _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
+    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
         if let Some(action) = self.outbox.pop() {
             return Poll::Ready(action);
         }
