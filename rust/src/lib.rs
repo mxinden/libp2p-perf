@@ -12,7 +12,6 @@ use libp2p::{
         muxing::StreamMuxerBox,
         transport::{choice::OrTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
-        Multiaddr,
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
@@ -49,7 +48,6 @@ impl std::fmt::Display for TcpTransportSecurity {
 pub fn build_transport(
     keypair: identity::Keypair,
     tcp_transport_security: TcpTransportSecurity,
-    quic_addr: Option<Multiaddr>,
 ) -> std::io::Result<core::transport::Boxed<(PeerId, StreamMuxerBox)>> {
     let tcp_transport = {
         let mut yamux_config = yamux::YamuxConfig::default();
@@ -140,7 +138,9 @@ pub fn build_transport(
             }
         };
 
-        let transport = block_on(dns::DnsConfig::system(tcp::TcpConfig::new().nodelay(true)))?;
+        let transport = block_on(dns::DnsConfig::system(tcp::TcpTransport::new(
+            tcp::GenTcpConfig::new().nodelay(true),
+        )))?;
 
         transport
             .upgrade(core::upgrade::Version::V1Lazy)
@@ -160,11 +160,8 @@ pub fn build_transport(
     };
 
     let quic_transport = {
-        let config = QuicConfig::new(&keypair, quic_addr.unwrap_or("/ip4/0.0.0.0/udp/0/quic".parse().unwrap()))
-            .unwrap();
-        let endpoint = libp2p::quic::Endpoint::new(config)
-            .unwrap();
-        QuicTransport::new(endpoint)
+        let config = QuicConfig::new(&keypair).unwrap();
+        QuicTransport::new(config)
     };
 
     Ok(OrTransport::new(quic_transport, tcp_transport)
@@ -191,13 +188,13 @@ mod tests {
     #[test]
     fn it_works() {
         let mut pool = LocalPool::new();
-        let _  = tracing_subscriber::fmt().try_init();
+        let _ = tracing_subscriber::fmt().try_init();
 
         let mut sender = {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let transport = build_transport(key, TcpTransportSecurity::Plaintext, None).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -206,8 +203,7 @@ mod tests {
             let key = identity::Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(key.public());
 
-            let quic_addr = Some("/ip4/0.0.0.0/udp/9992/quic".parse().unwrap());
-            let transport = build_transport(key, TcpTransportSecurity::Plaintext, quic_addr).unwrap();
+            let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
             Swarm::new(transport, perf, local_peer_id)
         };
@@ -238,7 +234,7 @@ mod tests {
             )
             .unwrap();
 
-        sender.dial(receiver_address).unwrap();
+        sender.dial(receiver_listen_addr).unwrap();
 
         pool.run_until(async move {
             loop {

@@ -3,8 +3,8 @@ use futures::stream::FuturesUnordered;
 use libp2p::{
     core::upgrade::{InboundUpgrade, OutboundUpgrade},
     swarm::{
-        KeepAlive, NegotiatedSubstream, ConnectionHandler, ConnectionHandlerEvent,
-        ConnectionHandlerUpgrErr, SubstreamProtocol,
+        ConnectionHandler, ConnectionHandlerEvent, ConnectionHandlerUpgrErr, KeepAlive,
+        NegotiatedSubstream, SubstreamProtocol,
     },
 };
 use std::io;

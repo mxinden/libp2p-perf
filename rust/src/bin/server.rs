@@ -41,12 +41,7 @@ async fn main() {
 
     println!("Local peer id: {:?}", local_peer_id);
 
-    let transport = build_transport(
-        key,
-        TcpTransportSecurity::All,
-        Some("/ip4/0.0.0.0/udp/9992/quic".parse().unwrap()),
-    )
-    .unwrap();
+    let transport = build_transport(key, TcpTransportSecurity::All).unwrap();
     let perf = Perf::default();
     let mut server = SwarmBuilder::new(transport, perf, local_peer_id.clone())
         .executor(Box::new(|f| {
