@@ -1,7 +1,8 @@
 use crate::handler::{PerfHandler, PerfHandlerIn, PerfHandlerOut};
 use libp2p::{
     core::{
-        connection::{ConnectionId, ListenerId},
+        connection::ConnectionId,
+        transport::ListenerId,
         ConnectedPoint,
     },
     swarm::{
