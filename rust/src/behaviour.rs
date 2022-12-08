@@ -1,10 +1,6 @@
 use crate::handler::{PerfHandler, PerfHandlerIn, PerfHandlerOut};
 use libp2p::{
-    core::{
-        connection::ConnectionId,
-        transport::ListenerId,
-        ConnectedPoint,
-    },
+    core::{connection::ConnectionId, transport::ListenerId, ConnectedPoint},
     swarm::{
         ConnectionHandler, DialError, IntoConnectionHandler, NetworkBehaviour,
         NetworkBehaviourAction, NotifyHandler, PollParameters,
