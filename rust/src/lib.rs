@@ -138,10 +138,10 @@ pub fn build_transport(
     };
 
     let transport = if in_memory {
-        EitherTransport::Left(MemoryTransport {})
+        EitherTransport::Left(MemoryTransport::new())
     } else {
         EitherTransport::Right(block_on(dns::DnsConfig::system(
-            tcp::TcpConfig::new().nodelay(true),
+            tcp::async_io::Transport::new(tcp::Config::new().nodelay(true)),
         ))?)
     };
 
@@ -188,7 +188,7 @@ mod tests {
 
             let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
-            Swarm::new(transport, perf, local_peer_id)
+            Swarm::with_async_std_executor(transport, perf, local_peer_id)
         };
 
         let mut receiver = {
@@ -197,7 +197,7 @@ mod tests {
 
             let transport = build_transport(true, key, TransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
-            Swarm::new(transport, perf, local_peer_id)
+            Swarm::with_async_std_executor(transport, perf, local_peer_id)
         };
         let receiver_address: Multiaddr = Protocol::Memory(random::<u64>()).into();
 

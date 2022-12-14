@@ -7,6 +7,9 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
+      - name: Install Protoc
+        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -35,6 +38,9 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
+      - name: Install Protoc
+        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -80,6 +86,9 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - name: Install Protoc
+        uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
