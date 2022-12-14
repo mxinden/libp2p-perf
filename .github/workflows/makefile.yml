@@ -12,8 +12,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+
       - name: Install Protoc
         uses: arduino/setup-protoc@64c0c85d18e984422218383b81c52f8b077404d3 # v1.1.2
+
       - uses: actions/setup-go@v2
         with:
           go-version: "1.19.x"
