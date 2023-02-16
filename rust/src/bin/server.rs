@@ -41,12 +41,12 @@ async fn main() {
 
     poll_fn(|cx| loop {
         match server.poll_next_unpin(cx) {
-            Poll::Ready(Some(e)) => println!("{:?}", e),
+            Poll::Ready(Some(e)) => println!("{e:?}"),
             Poll::Ready(None) => panic!("Unexpected server termination."),
             Poll::Pending => {
                 if !listening {
                     if let Some(a) = Swarm::listeners(&server).next() {
-                        println!("Listening on {:?}.", a);
+                        println!("Listening on {a:?}.");
                         listening = true;
                     }
                 }

@@ -3,12 +3,12 @@ mod handler;
 mod protocol;
 
 pub use behaviour::{Perf, PerfEvent};
+use either::Either;
 use futures::executor::block_on;
 
 use libp2p::{
     core::{
         self,
-        either::{EitherOutput, EitherTransport},
         muxing::StreamMuxerBox,
         transport::{MemoryTransport, Transport},
         upgrade::{InboundUpgradeExt, OptionalUpgrade, OutboundUpgradeExt, SelectUpgrade},
@@ -40,7 +40,7 @@ impl std::str::FromStr for TransportSecurity {
 
 impl std::fmt::Display for TransportSecurity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -138,9 +138,9 @@ pub fn build_transport(
     };
 
     let transport = if in_memory {
-        EitherTransport::Left(MemoryTransport::new())
+        Either::Left(MemoryTransport::new())
     } else {
-        EitherTransport::Right(block_on(dns::DnsConfig::system(
+        Either::Right(block_on(dns::DnsConfig::system(
             tcp::async_io::Transport::new(tcp::Config::new().nodelay(true)),
         ))?)
     };
@@ -149,14 +149,8 @@ pub fn build_transport(
         .upgrade(core::upgrade::Version::V1)
         .authenticate(
             transport_security_config
-                .map_inbound(move |result| match result {
-                    EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
-                    EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
-                })
-                .map_outbound(move |result| match result {
-                    EitherOutput::First((peer_id, o)) => (peer_id, EitherOutput::First(o)),
-                    EitherOutput::Second((peer_id, o)) => (peer_id, EitherOutput::Second(o)),
-                }),
+                .map_inbound(move |result| result.factor_first())
+                .map_outbound(move |result| result.factor_first()),
         )
         .multiplex(yamux_config)
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))

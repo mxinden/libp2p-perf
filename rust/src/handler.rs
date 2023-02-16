@@ -3,8 +3,12 @@ use futures::stream::FuturesUnordered;
 use libp2p::{
     core::upgrade::{InboundUpgrade, OutboundUpgrade},
     swarm::{
-        ConnectionHandler, ConnectionHandlerEvent, ConnectionHandlerUpgrErr, KeepAlive,
-        NegotiatedSubstream, SubstreamProtocol,
+        handler::{
+            ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound,
+            ListenUpgradeError,
+        },
+        ConnectionHandler, ConnectionHandlerEvent, KeepAlive, NegotiatedSubstream,
+        SubstreamProtocol,
     },
 };
 use std::io;
@@ -242,33 +246,7 @@ impl ConnectionHandler for PerfHandler {
         SubstreamProtocol::new(PerfProtocolConfig {}, ())
     }
 
-    /// Injects the output of a successful upgrade on a new inbound substream.
-    fn inject_fully_negotiated_inbound(
-        &mut self,
-        substream: <Self::InboundProtocol as InboundUpgrade<NegotiatedSubstream>>::Output,
-        _info: Self::InboundOpenInfo,
-    ) {
-        self.perf_runs.push(PerfRun::new(PerfRunStream::Receiver(
-            substream,
-            vec![0; BUFFER_SIZE],
-        )));
-    }
-
-    /// Injects the output of a successful upgrade on a new outbound substream.
-    ///
-    /// The second argument is the information that was previously passed to
-    /// [`ConnectionHandlerEvent::OutboundSubstreamRequest`].
-    fn inject_fully_negotiated_outbound(
-        &mut self,
-        substream: <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Output,
-        _info: Self::OutboundOpenInfo,
-    ) {
-        self.perf_runs
-            .push(PerfRun::new(PerfRunStream::Sender(substream)));
-    }
-
-    /// Injects an event coming from the outside in the handler.
-    fn inject_event(&mut self, event: Self::InEvent) {
+    fn on_behaviour_event(&mut self, event: Self::InEvent) {
         match event {
             PerfHandlerIn::StartPerf => {
                 self.outbox
@@ -279,15 +257,38 @@ impl ConnectionHandler for PerfHandler {
         }
     }
 
-    /// Indicates to the handler that upgrading a substream to the given protocol has failed.
-    fn inject_dial_upgrade_error(
+    fn on_connection_event(
         &mut self,
-        _info: Self::OutboundOpenInfo,
-        error: ConnectionHandlerUpgrErr<
-            <Self::OutboundProtocol as OutboundUpgrade<NegotiatedSubstream>>::Error,
+        event: ConnectionEvent<
+            Self::InboundProtocol,
+            Self::OutboundProtocol,
+            Self::InboundOpenInfo,
+            Self::OutboundOpenInfo,
         >,
     ) {
-        panic!("{:?}", error);
+        match event {
+            ConnectionEvent::FullyNegotiatedInbound(event) => {
+                let FullyNegotiatedInbound { protocol, .. } = event;
+                self.perf_runs.push(PerfRun::new(PerfRunStream::Receiver(
+                    protocol,
+                    vec![0; BUFFER_SIZE],
+                )));
+            }
+            ConnectionEvent::FullyNegotiatedOutbound(event) => {
+                let FullyNegotiatedOutbound { protocol, .. } = event;
+                self.perf_runs
+                    .push(PerfRun::new(PerfRunStream::Sender(protocol)));
+            }
+            ConnectionEvent::DialUpgradeError(event) => {
+                let DialUpgradeError { error, .. } = event;
+                panic!("{:?}", error);
+            }
+            ConnectionEvent::ListenUpgradeError(event) => {
+                let ListenUpgradeError { error, .. } = event;
+                panic!("listener upgrade error {:?}", error);
+            }
+            ConnectionEvent::AddressChange(_) => {}
+        }
     }
 
     /// Returns until when the connection should be kept alive.

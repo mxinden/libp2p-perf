@@ -1,9 +1,9 @@
 use crate::handler::{PerfHandler, PerfHandlerIn, PerfHandlerOut};
 use libp2p::{
-    core::{connection::ConnectionId, transport::ListenerId, ConnectedPoint},
     swarm::{
-        ConnectionHandler, DialError, IntoConnectionHandler, NetworkBehaviour,
-        NetworkBehaviourAction, NotifyHandler, PollParameters,
+        behaviour::{ConnectionEstablished, ListenerClosed, ListenerError},
+        ConnectionId, FromSwarm, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
+        PollParameters,
     },
     Multiaddr, PeerId,
 };
@@ -13,12 +13,7 @@ use std::time::Duration;
 
 #[derive(Default)]
 pub struct Perf {
-    outbox: Vec<
-        NetworkBehaviourAction<
-            <Self as NetworkBehaviour>::OutEvent,
-            <Self as NetworkBehaviour>::ConnectionHandler,
-        >,
-    >,
+    outbox: Vec<NetworkBehaviourAction<PerfEvent, PerfHandlerIn>>,
 }
 
 impl NetworkBehaviour for Perf {
@@ -34,64 +29,54 @@ impl NetworkBehaviour for Perf {
         vec![]
     }
 
-    fn inject_connection_established(
-        &mut self,
-        peer_id: &PeerId,
-        _: &ConnectionId,
-        connected_point: &ConnectedPoint,
-        _failed_addresses: Option<&Vec<Multiaddr>>,
-        _other_established: usize,
-    ) {
-        if connected_point.is_dialer() {
-            self.outbox.push(NetworkBehaviourAction::NotifyHandler {
-                peer_id: *peer_id,
-                event: PerfHandlerIn::StartPerf,
-                handler: NotifyHandler::Any,
-            })
-        };
+    fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+        match event {
+            FromSwarm::ConnectionEstablished(event) => {
+                let ConnectionEstablished {
+                    endpoint, peer_id, ..
+                } = event;
+                if endpoint.is_dialer() {
+                    self.outbox.push(NetworkBehaviourAction::NotifyHandler {
+                        peer_id,
+                        event: PerfHandlerIn::StartPerf,
+                        handler: NotifyHandler::Any,
+                    })
+                };
+            }
+            FromSwarm::DialFailure(_) => {
+                panic!("inject dial failure");
+            }
+            FromSwarm::ListenerError(event) => {
+                let ListenerError { err, .. } = event;
+                panic!("listener error {:?}", err);
+            }
+            FromSwarm::ListenerClosed(event) => {
+                let ListenerClosed { reason, .. } = event;
+                panic!("listener closed {:?}", reason);
+            }
+            _ => {}
+        }
     }
 
-    fn inject_event(
+    fn on_connection_handler_event(
         &mut self,
         _peer_id: PeerId,
-        _connection: ConnectionId,
-        event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
+        _connection_id: ConnectionId,
+        event: PerfHandlerOut,
     ) {
         match event {
+            //PerfHandlerOut::PerfRunDone(duration, transfered) => {},
             PerfHandlerOut::PerfRunDone(duration, transfered) => self.outbox.push(
                 NetworkBehaviourAction::GenerateEvent(PerfEvent::PerfRunDone(duration, transfered)),
             ),
         }
     }
 
-    fn inject_dial_failure(
-        &mut self,
-        _peer_id: Option<PeerId>,
-        _handler: PerfHandler,
-        _error: &DialError,
-    ) {
-        panic!("inject dial failure");
-    }
-
-    fn inject_new_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}
-
-    fn inject_expired_listen_addr(&mut self, _: ListenerId, _addr: &Multiaddr) {}
-
-    fn inject_new_external_addr(&mut self, _addr: &Multiaddr) {}
-
-    fn inject_listener_error(&mut self, _id: ListenerId, err: &(dyn std::error::Error + 'static)) {
-        panic!("listener error {:?}", err);
-    }
-
-    fn inject_listener_closed(&mut self, _id: ListenerId, reason: Result<(), &std::io::Error>) {
-        panic!("listener closed {:?}", reason);
-    }
-
     fn poll(
         &mut self,
         _cx: &mut Context,
         _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
+    ) -> Poll<NetworkBehaviourAction<PerfEvent, PerfHandlerIn>> {
         if let Some(action) = self.outbox.pop() {
             return Poll::Ready(action);
         }

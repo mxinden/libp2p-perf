@@ -39,7 +39,7 @@ async fn main() {
     loop {
         match client.next().await.expect("Infinite stream.") {
             SwarmEvent::Behaviour(e) => {
-                println!("{}", e);
+                println!("{e}");
 
                 // TODO: Fix hack
                 //
