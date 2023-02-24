@@ -1,6 +1,6 @@
 use futures::prelude::*;
-use libp2p::swarm::{SwarmBuilder, SwarmEvent};
-use libp2p::{identity, Multiaddr, PeerId};
+use libp2p::swarm::SwarmEvent;
+use libp2p::{identity, Multiaddr, PeerId, Swarm};
 use libp2p_perf::{build_transport, Perf, TcpTransportSecurity};
 use structopt::StructOpt;
 
@@ -42,11 +42,7 @@ async fn main() {
     )
     .unwrap();
     let perf = Perf::default();
-    let mut client = SwarmBuilder::new(transport, perf, local_peer_id)
-        .executor(Box::new(|f| {
-            async_std::task::spawn(f);
-        }))
-        .build();
+    let mut client = Swarm::with_async_std_executor(transport, perf, local_peer_id);
 
     client.dial(opt.server_address).unwrap();
 

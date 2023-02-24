@@ -15,7 +15,7 @@ use libp2p::{
     },
     dns, identity, noise,
     plaintext::PlainText2Config,
-    quic::{Config as QuicConfig, QuicTransport},
+    quic::{async_std::Transport as QuicTransport, Config as QuicConfig},
     tcp, yamux, PeerId,
 };
 
@@ -160,7 +160,7 @@ pub fn build_transport(
     };
 
     let quic_transport = {
-        let config = QuicConfig::new(&keypair).unwrap();
+        let config = QuicConfig::new(&keypair);
         QuicTransport::new(config)
     };
 
@@ -196,7 +196,7 @@ mod tests {
 
             let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
-            Swarm::new(transport, perf, local_peer_id)
+            Swarm::with_async_std_executor(transport, perf, local_peer_id)
         };
 
         let mut receiver = {
@@ -205,7 +205,7 @@ mod tests {
 
             let transport = build_transport(key, TcpTransportSecurity::Plaintext).unwrap();
             let perf = Perf::default();
-            Swarm::new(transport, perf, local_peer_id)
+            Swarm::with_async_std_executor(transport, perf, local_peer_id)
         };
         let receiver_address: Multiaddr = "/ip4/127.0.0.1/udp/9992/quic".parse().unwrap();
 

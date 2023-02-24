@@ -21,11 +21,6 @@ pub struct Perf {
     >,
 }
 
-enum Direction {
-    Incoming,
-    Outgoing,
-}
-
 impl NetworkBehaviour for Perf {
     type ConnectionHandler = PerfHandler;
 
@@ -44,31 +39,16 @@ impl NetworkBehaviour for Perf {
         peer_id: &PeerId,
         _: &ConnectionId,
         connected_point: &ConnectedPoint,
-        _: Option<&Vec<Multiaddr>>,
-        _: usize,
+        _failed_addresses: Option<&Vec<Multiaddr>>,
+        _other_established: usize,
     ) {
-        let direction = match connected_point {
-            ConnectedPoint::Dialer { .. } => Direction::Outgoing,
-            ConnectedPoint::Listener { .. } => Direction::Incoming,
-        };
-
-        if matches!(direction, Direction::Outgoing) {
+        if connected_point.is_dialer() {
             self.outbox.push(NetworkBehaviourAction::NotifyHandler {
                 peer_id: peer_id.clone(),
                 event: PerfHandlerIn::StartPerf,
                 handler: NotifyHandler::Any,
             })
         }
-    }
-
-    fn inject_connection_closed(
-        &mut self,
-        _: &PeerId,
-        _: &ConnectionId,
-        _: &ConnectedPoint,
-        _handler: PerfHandler,
-        _: usize,
-    ) {
     }
 
     fn inject_event(

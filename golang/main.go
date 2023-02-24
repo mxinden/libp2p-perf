@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	noise "github.com/libp2p/go-libp2p-noise"
-	quic "github.com/libp2p/go-libp2p-quic-transport"
+	"github.com/libp2p/go-libp2p/p2p/transport/quic"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -58,7 +58,7 @@ func main() {
 		}
 	}
 
-	transport, err := quic.NewTransport(priv, nil, nil)
+	transport, err := libp2pquic.NewTransport(priv, nil, nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -78,7 +78,7 @@ func main() {
 
 	ctx := context.Background()
 	ctx, cancelLibp2p := context.WithCancel(ctx)
-	basicHost, err := libp2p.New(ctx, opts...)
+	basicHost, err := libp2p.New(opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -118,7 +118,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	peerid, err := peer.IDB58Decode(pid)
+	peerid, err := peer.Decode(pid)
 	if err != nil {
 		log.Fatalln(err)
 	}
